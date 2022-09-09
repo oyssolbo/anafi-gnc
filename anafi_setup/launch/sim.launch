@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Copied from https://github.com/vortexntnu/vortex-auv/blob/development/auv_setup/launch/beluga.launch at 08.09.22 -->
+
+  <env name="ROSCONSOLE_FORMAT" value="[${severity}] [${time}] [${node}]: ${message}" />
+
+  <!-- INPUT ARGS -->
+  <arg name="drone_ip" default="10.202.0.1"/> 
+
+  <!-- PARAMETERS -->
+  <!-- <rosparam command="load" file="$(find anafi_setup)/config/anafi_config.yaml"/> -->
+
+  <!-- INCLUDES -->
+  <include file="$(find control_launch)/launch/control.launch"    pass_all_args="true"/>
+  <include file="$(find mission_launch)/launch/mission.launch"    pass_all_args="true"/>
+  <include file="$(find drone_interface)/launch/anafi_sim.launch" pass_all_args="true"/>
+  <include file="$(find guidance)/launch/guidance.launch"         pass_all_args="true"/>
+  <!-- <include file="$(find perception)/launch/perception_sim.launch"     pass_all_args="true"/> -->
+
+</launch>
