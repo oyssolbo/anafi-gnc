@@ -1,0 +1,13 @@
+# Following the notation in Fossen 2021
+
+Header header
+
+# Drone position
+float32 x       # [m]
+float32 y       # [m]
+float32 z       # [m]
+
+# Drone heading
+float32 psi     # [rad]  
+---
+bool is_set

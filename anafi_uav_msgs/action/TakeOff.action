@@ -1,0 +1,8 @@
+# Goal: Position to reach
+---
+# Result: Final position
+int32 final_z_ned     # [m]
+bool is_hovering
+---
+# Feedback: Current position
+int32 z_ned           # [m]
