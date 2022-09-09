@@ -1,0 +1,9 @@
+<launch>
+    <node
+        name="sphinx_ground_truth"
+        pkg="ground_truth"
+        type="sphinx_ros_bridge.py"
+        output="screen" >
+        <param name="config_file" value="config.yaml" />
+    </node>
+</launch>

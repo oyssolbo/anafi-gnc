@@ -1,0 +1,26 @@
+drone:
+  mass_g: 315
+  camera:
+    img_width: 1280
+    img_height: 720
+    offset_x_mm: 70
+    offset_y_mm: 0
+    offset_z_mm: 0
+    camera_matrix: [9.412189028123261778e+02, 0.000000000000000000e+00, 5.806581517118189595e+02,
+                    0.000000000000000000e+00, 9.326606388000454899e+02, 3.753484894513629229e+02,
+                    0.000000000000000000e+00, 0.000000000000000000e+00, 1.000000000000000000e+00]
+  topics:
+    output:
+      telemetry: "/drone/out/telemetry"
+      gnss: "/drone/out/gps"
+      camera: "/drone/out/image_rect_color"
+    input:
+      takeoff: "/drone/cmd/takeoff"
+      land: "/drone/cmd/land"
+      attitude_setpoint: "drone/cmd/set_attitude"
+      position_setpoint: "drone/cmd/set_position_relative"
+      saturation_limits: "drone/cmd/set_saturation_limits"
+  attitude_offsets:
+    roll: -0.9
+    pitch: -5.9
+    yaw: 0
