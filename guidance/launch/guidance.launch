@@ -1,0 +1,9 @@
+<launch>
+    <node
+        name="guidance"
+        pkg="guidance"
+        type="guidance.py"
+        output="screen">
+        <param name="config_file" value="config.yaml" />
+    </node>
+</launch>

@@ -1,0 +1,22 @@
+rate_Hz: 20
+velocity_limits:
+  vx: [-0.3, 0.3]
+  vy: [-0.3, 0.3]
+  vz: [-0.1, 0.1]
+pp:
+  ua_max: 10      # Look this up later
+  lookahead: 0.25 # Smaller lookahead gives more aggressive guidance
+  kappa: 0.2      # Might be too small for our use case
+pid:
+  x_axis:
+    kp: 0.5
+    ki: 0
+    kd: 0
+  y_axis:
+    kp: 0.5
+    ki: 0
+    kd: 0
+  z_axis:
+    kp: 0.2
+    ki: 0
+    kd: 0
