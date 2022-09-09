@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+    <node
+        name="dnn_cv"
+        pkg="perception"
+        type="dnncv.py"
+        output="screen">
+        <param name="config_file" value="dnncv_config.yaml" />
+    </node>
+    <!-- <include file="$(find darknet_ros)/launch/anafi_real.launch"></include> -->
+</launch>

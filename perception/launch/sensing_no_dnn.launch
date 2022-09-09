@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+    <node name="ground_truth" pkg="utilities" type="ground_truth.py" output="screen" />
+    <node name="tcv" pkg="perception" type="tcv.py" output="screen" />
+    <node name="kalman_filter" pkg="perception" type="kalman_filter.py" output="screen" />
+    <node name="mock_gps" pkg="perception" type="mock_gps.py" output="screen" />
+</launch>
