@@ -53,7 +53,7 @@ class AttitudeController():
     # Set up subscribers 
     rospy.Subscriber("/drone/out/telemetry", AnafiTelemetry, self.__telemetry_cb)
     rospy.Subscriber("/estimate/ekf", EkfOutput, self.__ekf_cb)
-    rospy.Subscriber("/attitude_controller/reference_states", ReferenceStates, self.__set_reference_velocities)
+    rospy.Subscriber("/guidance/velocity_reference", ReferenceStates, self.__set_reference_velocities)
 
     # Set up publishers
     self.attitude_ref_pub = rospy.Publisher("/drone/cmd/set_attitude", AttitudeSetpoint, queue_size=1)
@@ -104,7 +104,6 @@ class AttitudeController():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = np.array([msg.x_r, msg.y_r, msg.z_r]).T 
     self.velocities_relative_to_helipad = np.array([msg.u_r, msg.v_r, msg.w_r]).T
 
 
