@@ -1,0 +1,9 @@
+setup.py
+scripts/attitude_control.egg-info/PKG-INFO
+scripts/attitude_control.egg-info/SOURCES.txt
+scripts/attitude_control.egg-info/dependency_links.txt
+scripts/attitude_control.egg-info/top_level.txt
+scripts/attitude_control_helpers/__init__.py
+scripts/attitude_control_helpers/attitude_reference_model.py
+scripts/attitude_control_helpers/utilities.py
+scripts/attitude_control_helpers/velocity_reference_model.py

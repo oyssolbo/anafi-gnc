@@ -10,8 +10,9 @@ project(drone_interface)
 find_package(catkin REQUIRED
   rospy
   std_msgs
+  sensor_msgs
   anafi_uav_msgs
-  message_generation
+  # message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -106,7 +107,7 @@ find_package(catkin REQUIRED
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  CATKIN_DEPENDS message_runtime
+  # CATKIN_DEPENDS message_runtime
 #  INCLUDE_DIRS include
 #  LIBRARIES drone_interface
 #  CATKIN_DEPENDS other_catkin_pkg

@@ -8,8 +8,7 @@ import threading
 
 import rospy
 import sensor_msgs.msg
-# import anafi_uav_msgs.msg
-import anafi_uav_msgs
+import anafi_uav_msgs.msg
 
 import olympe
 import olympe.messages as olympe_msgs

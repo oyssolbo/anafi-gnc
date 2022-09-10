@@ -1,10 +1,10 @@
 <launch>
   <node
     name="attitude_control"
-    pkg="attitude_controller"
+    pkg="attitude_control"
     type="attitude_controller.py"
     output="screen">
-    <rosparam command="load" file="$(find attitude_controller)/config/attitude_controller.yaml" />
+    <rosparam command="load" file="$(find attitude_control)/config/attitude_control.yaml" />
     <!-- <param name="config_file" value="attitude_control.yaml" /> -->
   </node>
 </launch>

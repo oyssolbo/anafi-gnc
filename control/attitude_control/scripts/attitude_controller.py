@@ -1,15 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 import numpy as np
 
 import rospy
 import std_msgs.msg
 
-import velocity_reference_model
-import attitude_reference_model
-import utilities
+import attitude_control_helpers.velocity_reference_model as velocity_reference_model
+import attitude_control_helpers.attitude_reference_model as attitude_reference_model
+import attitude_control_helpers.utilities as utilities
 
-import anafi_uav_msgs
+from anafi_uav_msgs.msg import AttitudeSetpoint, AnafiTelemetry, EkfOutput, ReferenceStates
+from anafi_uav_msgs.srv import SetControllerState, SetControllerStateResponse
 
 class AttitudeController():
   """
@@ -23,42 +24,39 @@ class AttitudeController():
   def __init__(self) -> None:
 
     # Initializing node
-    node_name = "attitude_controller"
-    config_file = utilities.load_config_file(node_name)
-    controller_rate = config_file["rate_Hz"]
+    node_name = rospy.get_param("~node_name", default = "attitude_controller_node")
+    controller_rate = rospy.get_param("~rate_Hz", default = 20)
     self.dt = 1.0 / controller_rate 
 
     rospy.init_node(node_name)
-    rospy.Rate(controller_rate)
+    self.rate = rospy.Rate(controller_rate)
 
     # Initializing reference models
-    # Assuming a PID is sufficient during the initial rewriting
-    rospy.loginfo(f"Controller started with control method: PID")
-    att_controller_params = config_file["pid"]
-    att_limits = config_file["attitude_limits"]
+    pid_controller_parameters = rospy.get_param("~pid")
+    attitude_limits = rospy.get_param("~attitude_limits")
     self.attitude_reference_model = attitude_reference_model.PIDReferenceGenerator(
-      params=att_controller_params,
-      limits=att_limits
+      params=pid_controller_parameters,
+      limits=attitude_limits
     )
 
-    velocity_reference_omegas = config_file["reference_model"]["omegas"]
-    velocity_reference_zetas = config_file["reference_model"]["zetas"]
+    velocity_reference_model_parameters = rospy.get_param("~velocity_reference_model")
+    velocity_reference_omegas = velocity_reference_model_parameters["omegas"]
+    velocity_reference_zetas = velocity_reference_model_parameters["zetas"]
     self.velocity_reference_model = velocity_reference_model.VelocityReferenceModel(
       omegas=velocity_reference_omegas,
       zetas=velocity_reference_zetas
     )
 
     # Set up a service for changing desired states (may be considered as an action in the future - changed to a publisher due to the update rate)
-    # rospy.Service("/attitude_controller/set_reference_velocities", anafi_uav_msgs.srv.SetReferenceVelocities, self.__set_reference_velocities)
-    rospy.Service("/attitude_controller/set_controller_state", anafi_uav_msgs.srv.SetControllerState, self.__set_output_state)
+    rospy.Service("/attitude_controller/set_controller_state", SetControllerState, self.__set_output_state)
 
     # Set up subscribers 
-    rospy.Subscriber("/drone/out/telemetry", anafi_uav_msgs.msg.AnafiTelemetry, self.__telemetry_cb)
-    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.EkfOutput, self.__ekf_cb)
-    rospy.Subscriber("/attitude_controller/reference_states", anafi_uav_msgs.msg.ReferenceStates, self.__set_reference_velocities)
+    rospy.Subscriber("/drone/out/telemetry", AnafiTelemetry, self.__telemetry_cb)
+    rospy.Subscriber("/estimate/ekf", EkfOutput, self.__ekf_cb)
+    rospy.Subscriber("/attitude_controller/reference_states", ReferenceStates, self.__set_reference_velocities)
 
     # Set up publishers
-    self.attitude_ref_pub = rospy.Publisher("/drone/cmd/set_attitude", anafi_uav_msgs.msg.AttitudeSetpoint, queue_size=1)
+    self.attitude_ref_pub = rospy.Publisher("/drone/cmd/set_attitude", AttitudeSetpoint, queue_size=1)
 
     # Initial values
     self.reference_velocities : np.ndarray = np.zeros((3, 1))
@@ -73,7 +71,7 @@ class AttitudeController():
     self.is_controller_active : bool = False
 
 
-  def __set_reference_velocities(self, msg : anafi_uav_msgs.msg.ReferenceStates):
+  def __set_reference_velocities(self, msg : ReferenceStates):
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.state_update_timestamp, msg_timestamp):
@@ -84,19 +82,21 @@ class AttitudeController():
     self.reference_velocities = np.array([msg.u_ref, msg.v_ref, msg.w_ref]).T
 
 
-  def __set_output_state(self, msg : anafi_uav_msgs.srv.SetControllerState):
+  def __set_output_state(self, msg : SetControllerState):
     msg_timestamp = msg.header.stamp
 
+    res = SetControllerStateResponse()
     if not utilities.is_new_msg_timestamp(self.output_data_timestamp, msg_timestamp):
       # Old message
-      return False
+      res.success = False
+    else:
+      self.output_data_timestamp = msg_timestamp
+      self.is_controller_active = msg.desired_controller_state
+      res.success = True 
+    return res 
 
-    self.output_data_timestamp = msg_timestamp
-    self.is_controller_active = msg.desired_controller_state
-    return True
 
-
-  def __ekf_cb(self, msg : anafi_uav_msgs.msg.EkfOutput) -> None:
+  def __ekf_cb(self, msg : EkfOutput) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
@@ -108,7 +108,7 @@ class AttitudeController():
     self.velocities_relative_to_helipad = np.array([msg.u_r, msg.v_r, msg.w_r]).T
 
 
-  def __telemetry_cb(self, msg : anafi_uav_msgs.msg.AnafiTelemetry) -> None:
+  def __telemetry_cb(self, msg : AnafiTelemetry) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
@@ -134,7 +134,7 @@ class AttitudeController():
 
         att_ref = self.attitude_reference_model.get_attitude_reference(
           v_ref=v_d[:2],
-          v=self.velocities_relative_to_helipad[:2], #self.velocities_body[:2], # Will this use own velocity, or relative velocity to the helipad. Think relative
+          v=self.velocities_relative_to_helipad[:2],
           ts=utilities.calculate_timestamp_difference_ns(
             oldest_stamp=self.publish_timestamp, 
             newest_stamp=new_stamp
@@ -150,7 +150,7 @@ class AttitudeController():
         self.reference_velocities = np.zeros((3, 1))
         v_d = np.zeros((4, 1))
       
-      rospy.Rate.sleep()
+      self.rate.sleep()
 
 
 def main():

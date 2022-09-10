@@ -1,24 +1,26 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>attitude_controller</name>
+  <name>attitude_control</name>
   <version>0.0.0</version>
-  <description>The attitude_controller package</description>
+  <description>The attitude_control package</description>
 
   <maintainer email="killah@todo.todo">killah</maintainer>
   <license>TODO</license>
 
+  <depend>anafi_uav_msgs</depend>
+
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>roscpp</build_depend>
+  <!-- <build_depend>roscpp</build_depend> -->
   <build_depend>rospy</build_depend>
-  <build_depend>anafi_uav_msgs</build_depend>
+  <!-- <build_depend>anafi_uav_msgs</build_depend> -->
 
-  <build_export_depend>roscpp</build_export_depend>
+  <!-- <build_export_depend>roscpp</build_export_depend> -->
   <build_export_depend>rospy</build_export_depend>
-  <build_export_depend>anafi_uav_msgs</build_export_depend>
+  <!-- <build_export_depend>anafi_uav_msgs</build_export_depend> -->
 
-  <exec_depend>roscpp</exec_depend>
+  <!-- <exec_depend>roscpp</exec_depend> -->
   <exec_depend>rospy</exec_depend>
-  <exec_depend>anafi_uav_msgs</exec_depend>
+  <!-- <exec_depend>anafi_uav_msgs</exec_depend> -->
 
 
   <!-- The export tag contains other, unspecified, tags -->
