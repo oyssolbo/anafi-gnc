@@ -1,22 +1,15 @@
+node_name: "pure_pursuit_guidance_node"
+
 rate_Hz: 20
 velocity_limits:
   vx: [-0.3, 0.3]
   vy: [-0.3, 0.3]
   vz: [-0.1, 0.1]
-pp:
+
+pure_pursuit_parameters:
   ua_max: 10      # Look this up later
   lookahead: 0.25 # Smaller lookahead gives more aggressive guidance
   kappa: 0.2      # Might be too small for our use case
-pid:
-  x_axis:
-    kp: 0.5
-    ki: 0
-    kd: 0
-  y_axis:
-    kp: 0.5
-    ki: 0
-    kd: 0
-  z_axis:
-    kp: 0.2
-    ki: 0
-    kd: 0
+
+max_error_normed: 10  # [m] Outside of this error, the pure pursuit guidance
+                      # law will not be used
