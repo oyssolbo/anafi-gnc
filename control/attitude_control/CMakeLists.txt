@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(attitude_controller)
+project(attitude_control)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -8,20 +8,14 @@ project(attitude_controller)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
   rospy
   anafi_uav_msgs
 )
 
-# generate_dynamic_reconfigure_options(
-# 	cfg/AttitudeControl.cfg
-# )
-
-
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES control
-#  CATKIN_DEPENDS roscpp rospy
+  CATKIN_DEPENDS rospy
 #  DEPENDS system_lib
 )
 
@@ -40,13 +34,13 @@ include_directories(
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-catkin_install_python(PROGRAMS
-  scripts/attitude_controller.py
-  # scripts/utilities.py
-  # scripts/velocity_reference_model.py 
-  # scripts/attitude_reference_model.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+# catkin_install_python(PROGRAMS
+#   scripts/attitude_controller.py
+#   # scripts/attitude_utilities.py
+#   # scripts/velocity_reference_model.py 
+#   # scripts/attitude_reference_model.py
+#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+# )
 
 
 ## Mark executables for installation

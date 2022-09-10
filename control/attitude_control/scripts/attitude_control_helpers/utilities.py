@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 import os
 import sys 
@@ -7,8 +7,8 @@ import yaml
 import numpy as np
 
 import rospy 
-import std_msgs
-import anafi_uav_msgs
+import std_msgs.msg
+from anafi_uav_msgs.msg import AttitudeSetpoint
 
 def load_config_file(node_name: str) -> dict:
     """
@@ -29,6 +29,7 @@ def load_config_file(node_name: str) -> dict:
     Martin Falang (2021-2022)
 
     """
+    print(f"/../../{node_name}/config_file")
     config_file = rospy.get_param(f"/{node_name}/config_file")
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -77,7 +78,7 @@ def load_config(node_name: str, rosparam_name: str) -> dict:
     return config
 
 
-def pack_attitude_ref_msg(att_ref: np.ndarray) -> anafi_uav_msgs.msg.AttitudeSetpoint:
+def pack_attitude_ref_msg(att_ref: np.ndarray) -> AttitudeSetpoint:
     """Generate a attitude setpoint message attitude setpoints.
 
     Parameters
@@ -97,7 +98,7 @@ def pack_attitude_ref_msg(att_ref: np.ndarray) -> anafi_uav_msgs.msg.AttitudeSet
     
     """
 
-    msg = anafi_uav_msgs.msg.AttitudeSetpoint()
+    msg = AttitudeSetpoint()
     msg.header.stamp = rospy.Time.now()
     msg.roll = att_ref[0]
     msg.pitch = att_ref[1]

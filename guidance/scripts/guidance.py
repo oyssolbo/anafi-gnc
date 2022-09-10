@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-from distutils.command.config import config
 import rospy 
-import anafi_uav_msgs
 import std_msgs
+
+from anafi_uav_msgs.msg import EkfOutput, ReferenceStates
+from anafi_uav_msgs.srv import SetDesiredPose, SetDesiredPoseResponse
 
 import numpy as np
 
@@ -35,15 +36,15 @@ class GuidanceLaw():
     rospy.Rate(controller_rate)
 
     # Set up subscribers 
-    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.EkfOutput, self.__ekf_cb)
+    rospy.Subscriber("/estimate/ekf", EkfOutput, self.__ekf_cb)
     # rospy.Subscriber("/estimate/target_velocity", anafi_uav_msgs.msg.) # Would be nice to predict target movement
 
     # Set up publishers
     self.reference_velocity_publisher = rospy.Publisher(
-      "/attitude_controller/reference_states", anafi_uav_msgs.msg.ReferenceStates, queue_size=1)
+      "/attitude_controller/reference_states", ReferenceStates, queue_size=1)
 
     # Set up services
-    rospy.Service("/guidance/desired_pos", anafi_uav_msgs.srv.SetDesiredPose, self.__set_pos)
+    rospy.Service("/guidance/desired_pos", SetDesiredPose, self.__set_pos)
 
     # Initialize parameters
     params = config_file["pp"]
@@ -64,19 +65,21 @@ class GuidanceLaw():
     self.pos : np.ndarray = np.zeros((3, 1))          # [x, y, z]
 
 
-  def __set_pos(self, msg : anafi_uav_msgs.srv.SetDesiredPose):
+  def __set_pos(self, msg : SetDesiredPose):
     msg_timestamp = msg.header.stamp
 
+    res = SetDesiredPoseResponse()
     if not utilities.is_new_msg_timestamp(self.pose_timestamp, msg_timestamp):
       # Old message
-      return False
+      res.is_set = False
+    else:
+      self.pose_timestamp = msg_timestamp
+      self.desired_pos = np.array([msg.x, msg.y, msg.z]).T
+      res.is_set = True
+    return res
 
-    self.pose_timestamp = msg_timestamp
-    self.desired_pos = np.array([msg.x, msg.y, msg.z]).T
-    return True
 
-
-  def __ekf_cb(self, msg : anafi_uav_msgs.msg.EkfOutput) -> None:
+  def __ekf_cb(self, msg : EkfOutput) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
@@ -105,7 +108,7 @@ class GuidanceLaw():
     Generate a velocity reference from a position error using the pure
     pursuit guidance law as defined in Fossen 2021.
     """
-    reference_msg = anafi_uav_msgs.msg.ReferenceStates()
+    reference_msg = ReferenceStates()
     vel_target = np.zeros((3, 1)) # Extend the guidance-law to use constant bearing
   
     while not rospy.is_shutdown():

@@ -1,3 +1,5 @@
+node_name: "attitude_controller_node"
+
 rate_Hz: 20
 
 attitude_limits:
