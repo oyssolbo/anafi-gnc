@@ -12,8 +12,6 @@ find_package(catkin REQUIRED COMPONENTS
   anafi_uav_msgs
 )
 
-catkin_python_setup()
-
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES control
