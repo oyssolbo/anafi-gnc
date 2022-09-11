@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <node
+    name="mission_planning"
+    pkg="mission_planning"
+    type="mission_planner.py"
+    output="screen">
+    <rosparam command="load" file="$(find mission_planning)/config/config.yaml" />
+  </node>
+</launch>

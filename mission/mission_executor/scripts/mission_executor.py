@@ -5,14 +5,11 @@ import rospkg
 import actionlib
 
 import std_msgs.msg
-import perception.msg
-import drone_interface.msg
 
-import subprocess
 import numpy as np
 
-from enum import Enum
 from collections import deque
+from typing import Callable
 
 import anafi_uav_msgs.msg 
 from anafi_uav_msgs.srv import SetPlannedActions, SetPlannedActionsResponse
@@ -42,15 +39,16 @@ class MissionExecutorNode():
     rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self.__ekf_cb)
 
     # Setup services
-    rospy.Service("/mission_planner/set_planned_actions", SetBool, self.__set_planned_actions_srv_cb)
+    rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self.__set_planned_actions_srv_cb)
 
     # Setup actions
     self.is_action_list_updated : bool = False
-    self.action_update_timestep : rospy.Time = None
     self.action_list : list[str] = []
 
     self.last_telemetry_msg : anafi_uav_msgs.msg.AnafiTelemetry = None 
-    self.last_ekf_msg : anafi_uav_msgs.msg.PointWithCovarianceStamped = None 
+    self.pos : np.ndarray = np.ones((3, 1)) # Ones to have the initial error to exceed the tracking requirements
+
+    self.is_ordered_to_cancel_current_action : bool = False
 
 
   def __drone_telemetry_cb(
@@ -76,31 +74,25 @@ class MissionExecutorNode():
         self, 
         request : SetPlannedActions
       ) -> SetPlannedActionsResponse:
-    msg_timestamp = request.header.stamp
-
     response = SetPlannedActionsResponse()
-    if utilities.is_new_msg_timestamp(self.action_update_timestamp, msg_timestamp):
-      self.action_update_timestamp = msg_timestamp
-      num_actions = request.num_actions
-      action_list = [""] * num_actions 
 
-      for i in range(num_actions):
-        action_list[i] = request.action_list[i]
+    num_actions = request.num_actions
+    action_list = [""] * num_actions 
+
+    for i in range(num_actions):
+      action_list[i] = request.action_list[i]
       
-      self.is_action_list_updated = True
-      self.action_list = action_list
-      self.is_ordered_to_cancel_current_action = request.cancel_current_action
-      response.success = True 
-    else:
-      # Old service-request
-      rospy.logerror("[__set_planned_actions_srv_cb()] Old service request received")
-      response.success = False
+    self.is_action_list_updated = True
+    self.action_list = action_list
+    self.is_ordered_to_cancel_current_action = request.cancel_current_action
+    response.success = True 
 
     return response
 
 
-  def __get_next_action_function(self) -> function:
-    if self.action_list is None or self.action_list[0] == "":
+  def __get_next_action_function(self) -> Callable:
+    if self.action_list is None or not self.action_list or self.action_list[0] == "":
+      self.max_expected_action_time_s = rospy.get_param("~maximum_expected_action_time_s")["idle"]
       return self.__idle
 
     self.action_str = deque(self.action_list).popleft()
@@ -231,10 +223,10 @@ class MissionExecutorNode():
     start_time = rospy.Time.now()
 
     counter = 0
-    duration = 0
+    duration_s = 0
 
     # Could be problematic if the planner updates the mission 
-    while not rospy.is_shutdown() and duration < max_wait_time:
+    while not rospy.is_shutdown() and duration_s < max_wait_time:
       if self.new_telemetry_available:
         flying_state = self._prev_telemetry.flying_state
         if flying_state == state:
@@ -245,9 +237,9 @@ class MissionExecutorNode():
           counter = 0
       self.new_telemetry_available = False
       rospy.sleep(0.1)
-      duration = utilities.calculate_timestamp_difference_ns(start_time, rospy.Time.now()) * 1e-9
+      duration_s = utilities.calculate_timestamp_difference_s(start_time, rospy.Time.now())
     
-    return duration < max_wait_time
+    return duration_s < max_wait_time
     
 
   def __load_locations(self):
@@ -266,7 +258,7 @@ class MissionExecutorNode():
     A more stable method should be implemented
     """
 
-    if self.last_ekf_msg is None or self.last_telemetry_msg is None:
+    if self.last_telemetry_msg is None:
       return False
 
     if self.action_str == "takeoff":
@@ -306,7 +298,9 @@ class MissionExecutorNode():
 
 
   def execute_actions(self):
+    self.__get_next_action_function()
     start_time = rospy.Time.now()
+
     while not rospy.is_shutdown():
       # Things to take into account:
       # 1. What should happen if a new action sequence is received?
@@ -330,8 +324,7 @@ class MissionExecutorNode():
       # there will be situations when the system should be replanned
 
       current_time = rospy.Time.now()
-      passed_time_ns = utilities.calculate_timestamp_difference_ns(start_time, current_time)
-      passed_time_s = passed_time_ns * 1e-9
+      passed_time_s = utilities.calculate_timestamp_difference_s(start_time, current_time)
 
       is_current_action_finished = self.__check_current_action_finished()     
       is_action_cancellable = (passed_time_s > self.max_expected_action_time_s) or (self.is_ordered_to_cancel_current_action) 

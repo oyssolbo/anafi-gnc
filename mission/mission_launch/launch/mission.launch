@@ -1,12 +1,8 @@
 <?xml version="1.0"?>
 <launch>
 
-  <!-- Configuration parameters - change these -->
-  <param name="/velocity_controller/odometry_topic" value="/odometry/filtered" />
-  <param name="/velocity_controller/thrust_topic" value="/auv/thruster_manager/input" />
-
   <!-- Mission nodes -->
-  <include file="$(find action_planner)/launch/action_planner.launch" pass_all_args="true"/>
-  <include file="$(find action_executor)/launch/action_executor.launch" pass_all_args="true"/>
+  <include file="$(find mission_planning)/launch/mission_planner.launch" pass_all_args="true"/>
+  <include file="$(find mission_execution)/launch/mission_executor.launch" pass_all_args="true"/>
 
 </launch>
