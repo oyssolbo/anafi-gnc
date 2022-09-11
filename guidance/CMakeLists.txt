@@ -11,6 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   anafi_uav_msgs
+  std_srvs
+  std_msgs
 )
 
 ## System dependencies are found with CMake's conventions

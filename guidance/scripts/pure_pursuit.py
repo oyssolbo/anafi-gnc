@@ -14,6 +14,9 @@ class PurePursuitGuidanceLaw():
   """
   Guidance law generating the desired velocity based on the 
   desired and current position 
+
+  TODO:
+    - add guidance for multiple frames
   """
   def __init__(self) -> None:
     node_name = rospy.get_param("~node_name", default = "pure_pursuit_guidance_node")
@@ -32,7 +35,7 @@ class PurePursuitGuidanceLaw():
       "/guidance/velocity_reference", ReferenceStates, queue_size=1)
 
     # Set up services
-    # rospy.Service("/guidance/desired_pos", SetDesiredPose, self.__set_pos)
+    rospy.Service("/guidance/service/desired_pos", SetDesiredPose, self.__set_pos)
 
     # Initialize parameters
     pure_pursuit_params = rospy.get_param("~pure_pursuit_parameters")
@@ -49,28 +52,19 @@ class PurePursuitGuidanceLaw():
     self.ekf_timestamp : std_msgs.msg.Time = None
     # self.pose_timestamp : std_msgs.msg.Time = None
 
-    # self.desired_pos : np.ndarray = np.zeros((3, 1))  # [xd, yd, zd]
-    # self.pos : np.ndarray = np.zeros((3, 1))          # [x, y, z]
+    self.desired_pos : np.ndarray = np.zeros((3, 1))  # [xd, yd, zd]
+    self.pos : np.ndarray = np.zeros((3, 1))          # [x, y, z]
 
     self.pos_relative_to_helipad : np.ndarray = None 
 
 
-# Outcommented since unsure whether the guidance module should operate 
-# only when close to the helipad or not. In this case, it is assumed to have it
-# only operate close to the helipad, but that may change depending on the mission
-# we decide for later
-  # def __set_pos(self, msg : SetDesiredPose):
-  #   msg_timestamp = msg.header.stamp
+  def __set_pos(self, msg : SetDesiredPose):
+    frame = msg.coordinate_frame # May want to add guidance with respect to multiple frames TODO
+    self.desired_pos = np.array([msg.x, msg.y, msg.z]).T
 
-  #   res = SetDesiredPoseResponse()
-  #   if not utilities.is_new_msg_timestamp(self.pose_timestamp, msg_timestamp):
-  #     # Old message
-  #     res.is_set = False
-  #   else:
-  #     self.pose_timestamp = msg_timestamp
-  #     self.desired_pos = np.array([msg.x, msg.y, msg.z]).T
-  #     res.is_set = True
-  #   return res
+    res = SetDesiredPoseResponse()
+    res.success = True
+    return res
 
 
   def __ekf_cb(self, msg : EkfOutput) -> None:
@@ -99,7 +93,7 @@ class PurePursuitGuidanceLaw():
 
   def __get_valid_pos_error(self, prev_pos_error_normed : float) -> np.ndarray:
     """
-    Returns a valid error for
+    Returns a valid error for position
     """
     max_error = rospy.get_param("~max_error_normed", default=10)
 
