@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <node
+    name="mission_execution"
+    pkg="mission_execution"
+    type="mission_executor.py"
+    output="screen">
+    <rosparam command="load" file="$(find mission_execution)/config/config.yaml" />
+  </node>
+</launch>
