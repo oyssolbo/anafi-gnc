@@ -28,21 +28,20 @@ add_message_files(
   FILES
   AnafiTelemetry.msg
   AttitudeSetpoint.msg
-  PositionSetpointRelative.msg
-  SaturationLimits.msg
   EkfOutput.msg
   EulerPose.msg
   Heading.msg
   PointWithCovarianceStamped.msg
+  PositionSetpointRelative.msg
   ReferenceStates.msg
+  SaturationLimits.msg
 )
 
 # Generate services in the 'srv' folder
 add_service_files(
   FILES
   SetDesiredPose.srv
-  SetControllerState.srv
-  SetControllerAction.srv
+  SetPlannedActions.srv
 )
 
 # Generate actions in the 'action' folder
