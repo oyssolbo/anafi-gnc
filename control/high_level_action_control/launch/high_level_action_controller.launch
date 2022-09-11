@@ -1,0 +1,10 @@
+<launch>
+  <node
+    name="high_level_action_control"
+    pkg="high_level_action_control"
+    type="high_level_action_controller.py"
+    output="screen">
+    <rosparam command="load" file="$(find high_level_action_control)/config/config.yaml" />
+    <!-- <param name="config_file" value="attitude_control.yaml" /> -->
+  </node>
+</launch>
