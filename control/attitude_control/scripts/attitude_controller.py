@@ -10,7 +10,7 @@ import attitude_control_helpers.attitude_reference_model as attitude_reference_m
 import attitude_control_helpers.utilities as utilities
 
 from anafi_uav_msgs.msg import AttitudeSetpoint, AnafiTelemetry, EkfOutput, ReferenceStates
-from anafi_uav_msgs.srv import SetControllerState, SetControllerStateResponse
+from std_srvs.srv import SetBool, SetBoolResponse
 
 class AttitudeController():
   """
@@ -25,11 +25,11 @@ class AttitudeController():
 
     # Initializing node
     node_name = rospy.get_param("~node_name", default = "attitude_controller_node")
-    controller_rate = rospy.get_param("~rate_Hz", default = 20)
-    self.dt = 1.0 / controller_rate 
+    node_rate = rospy.get_param("~rate_Hz", default = 20)
+    self.dt = 1.0 / node_rate 
 
     rospy.init_node(node_name)
-    self.rate = rospy.Rate(controller_rate)
+    self.rate = rospy.Rate(node_rate)
 
     # Initializing reference models
     pid_controller_parameters = rospy.get_param("~pid")
@@ -48,7 +48,7 @@ class AttitudeController():
     )
 
     # Set up a service for changing desired states (may be considered as an action in the future - changed to a publisher due to the update rate)
-    rospy.Service("/attitude_controller/set_controller_state", SetControllerState, self.__set_output_state)
+    rospy.Service("/attitude_controller/service/enable_controller", SetBool, self.__enable_controller)
 
     # Set up subscribers 
     rospy.Subscriber("/drone/out/telemetry", AnafiTelemetry, self.__telemetry_cb)
@@ -64,7 +64,6 @@ class AttitudeController():
     self.velocities_relative_to_helipad : np.ndarray = np.zeros((3, 1))
 
     self.state_update_timestamp : std_msgs.msg.Time = None
-    self.output_data_timestamp : std_msgs.msg.Time = None
     self.ekf_timestamp : std_msgs.msg.Time = None
     self.publish_timestamp : std_msgs.msg.Time = None
 
@@ -82,17 +81,12 @@ class AttitudeController():
     self.reference_velocities = np.array([msg.u_ref, msg.v_ref, msg.w_ref]).T
 
 
-  def __set_output_state(self, msg : SetControllerState):
-    msg_timestamp = msg.header.stamp
+  def __enable_controller(self, msg : SetBool):
+    self.is_controller_active = msg.data
 
-    res = SetControllerStateResponse()
-    if not utilities.is_new_msg_timestamp(self.output_data_timestamp, msg_timestamp):
-      # Old message
-      res.success = False
-    else:
-      self.output_data_timestamp = msg_timestamp
-      self.is_controller_active = msg.desired_controller_state
-      res.success = True 
+    res = SetBoolResponse()
+    res.success = True
+    res.message = "" 
     return res 
 
 

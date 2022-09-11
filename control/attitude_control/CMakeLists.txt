@@ -10,6 +10,7 @@ project(attitude_control)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   anafi_uav_msgs
+  std_srvs
 )
 
 catkin_package(
