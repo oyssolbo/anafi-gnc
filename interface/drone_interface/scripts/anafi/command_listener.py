@@ -127,7 +127,7 @@ class CommandListener():
             Message containing the displacements and constraints for the
             desired movement of the drone
         """
-        rospy.loginfo(f"Moving dx: {msg.dx} dy: {msg.dy} dz: {msg.dz * 180 / np.pi} dpsi: {msg.dpsi}")
+        rospy.loginfo(f"Moving dx: {msg.dx} dy: {msg.dy} dz: {msg.dz} dpsi: {msg.dpsi * 180 / np.pi}")
         self.drone(olympe_msgs.move.extended_move_by(
             msg.dx, msg.dy, msg.dz, msg.dpsi,
             msg.max_horizontal_speed, msg.max_vertical_speed,

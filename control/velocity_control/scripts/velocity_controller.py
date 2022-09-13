@@ -40,15 +40,15 @@ class VelocityController():
       zetas=velocity_reference_zetas
     )
 
-    # Set up a service for changing desired states (may be considered as an action in the future - changed to a publisher due to the update rate)
+    # Setup services
     rospy.Service("/velocity_controller/service/enable_controller", SetBool, self.__enable_controller)
 
-    # Set up subscribers 
+    # Setup subscribers 
     rospy.Subscriber("/drone/out/telemetry", AnafiTelemetry, self.__telemetry_cb)
     rospy.Subscriber("/estimate/ekf", EkfOutput, self.__ekf_cb)
     rospy.Subscriber("/guidance/velocity_reference", ReferenceStates, self.__set_reference_velocities)
 
-    # Set up publishers
+    # Setup publishers
     self.attitude_ref_pub = rospy.Publisher("/drone/cmd/set_attitude", AttitudeSetpoint, queue_size=1)
 
     # Initial values
