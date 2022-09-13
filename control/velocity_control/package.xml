@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>velocity_control</name>
+  <version>0.0.0</version>
+  <description>The velocity_control package</description>
+
+  <maintainer email="killah@todo.todo">killah</maintainer>
+  <license>TODO</license>
+
+  <depend>anafi_uav_msgs</depend>
+  <depend>std_srvs</depend>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rospy</build_depend>
+
+  <build_export_depend>rospy</build_export_depend>
+
+  <exec_depend>rospy</exec_depend>
+
+  <export>
+  </export>
+</package>

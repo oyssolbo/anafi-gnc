@@ -5,21 +5,14 @@ import numpy as np
 import rospy
 import std_msgs.msg
 
-import attitude_control_helpers.velocity_reference_model as velocity_reference_model
-import attitude_control_helpers.attitude_reference_model as attitude_reference_model
-import attitude_control_helpers.utilities as utilities
+import velocity_control_helpers.velocity_reference_model as velocity_reference_model
+import velocity_control_helpers.attitude_reference_model as attitude_reference_model
+import velocity_control_helpers.utilities as utilities
 
 from anafi_uav_msgs.msg import AttitudeSetpoint, AnafiTelemetry, EkfOutput, ReferenceStates
 from std_srvs.srv import SetBool, SetBoolResponse
 
-class AttitudeController():
-  """
-  Controller implementing attitude-control of anafi-drone 
-
-  Potential upgrade:
-    - use an action for enabling / disabling the controller
-    - make the number of states less hardcoded
-  """
+class VelocityController():
 
   def __init__(self) -> None:
 
@@ -48,7 +41,7 @@ class AttitudeController():
     )
 
     # Set up a service for changing desired states (may be considered as an action in the future - changed to a publisher due to the update rate)
-    rospy.Service("/attitude_controller/service/enable_controller", SetBool, self.__enable_controller)
+    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self.__enable_controller)
 
     # Set up subscribers 
     rospy.Subscriber("/drone/out/telemetry", AnafiTelemetry, self.__telemetry_cb)
@@ -65,7 +58,6 @@ class AttitudeController():
 
     self.state_update_timestamp : std_msgs.msg.Time = None
     self.ekf_timestamp : std_msgs.msg.Time = None
-    self.publish_timestamp : std_msgs.msg.Time = None
 
     self.is_controller_active : bool = False
 
@@ -116,7 +108,7 @@ class AttitudeController():
     v_d = np.zeros((4, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
-        new_stamp = rospy.Time.now()
+        stamp = rospy.Time.now()
 
         v_d = self.velocity_reference_model.get_filtered_reference(
           xd_prev=v_d, 
@@ -128,12 +120,8 @@ class AttitudeController():
         att_ref = self.attitude_reference_model.get_attitude_reference(
           v_ref=v_d[:2],
           v=self.velocities_relative_to_helipad[:2],
-          ts=utilities.calculate_timestamp_difference_ns(
-            oldest_stamp=self.publish_timestamp, 
-            newest_stamp=new_stamp
-          )
+          ts=stamp
         )
-        self.publish_timestamp = new_stamp
 
         att_ref_3D = np.array([att_ref[0], att_ref[1], 0, v_d[2]]).T 
         att_ref_msg = utilities.pack_attitude_ref_msg(att_ref_3D)
@@ -147,7 +135,7 @@ class AttitudeController():
 
 
 def main():
-  node = AttitudeController()
+  node = VelocityController()
   node.publish_attitude_ref()
 
 

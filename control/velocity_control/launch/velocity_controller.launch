@@ -1,0 +1,9 @@
+<launch>
+  <node
+    name="velocity_control"
+    pkg="velocity_control"
+    type="velocity_controller.py"
+    output="screen">
+    <rosparam command="load" file="$(find velocity_control)/config/config.yaml" />
+  </node>
+</launch>

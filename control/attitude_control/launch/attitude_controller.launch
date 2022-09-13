@@ -1,9 +1,0 @@
-<launch>
-  <node
-    name="attitude_control"
-    pkg="attitude_control"
-    type="attitude_controller.py"
-    output="screen">
-    <rosparam command="load" file="$(find attitude_control)/config/config.yaml" />
-  </node>
-</launch>
