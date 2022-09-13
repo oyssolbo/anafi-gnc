@@ -5,7 +5,7 @@ import rospy
 import numpy as np
 
 import anafi_uav_msgs.msg
-from anafi_uav_msgs.srv import SetPlannedActions, SetPlannedActionsResponse
+from anafi_uav_msgs.srv import SetPlannedActions, SetPlannedActionsRequest
 
 import mission_planner_helpers.utilities as utilities
 
@@ -45,6 +45,7 @@ class MissionPlannerNode():
 
 
   def plan_continously(self):
+    # Simple test-case before future development
     service_name = "/mission_executor/service/set_planned_actions"
     action_plan_list = ["takeoff", "track", "land"]
     is_plan_updated = True 
@@ -56,34 +57,30 @@ class MissionPlannerNode():
 
       # Decide if the current plan must be cancelled TODO
 
-
-
-
       if is_plan_updated:
         try:
-          msg = SetPlannedActions()
-          for action in action_plan_list:
-            msg.action_list.append(action)
-          msg.num_actions = len(action_plan_list)
-          msg.cancel_current_action = False 
+          request = SetPlannedActionsRequest()
+          request.action_list = action_plan_list
+          request.num_actions = len(action_plan_list)
+          request.cancel_current_action = False 
 
           rospy.wait_for_service(service_name, timeout=2.0)
           service = rospy.ServiceProxy(service_name, SetPlannedActions)
 
-          service_response = service(msg)
+          service_response = service(request)
           if not service_response.success:
             rospy.loginfo("[plan_continously()] {} failed to set actions".format(service_name))
           else:
-            rospy.logerror("[plan_continously()] {} updated with new set of actions".format(service_name))
-            print("fuck python")
+            rospy.loginfo("[plan_continously()] {} updated with new set of actions".format(service_name))
             is_plan_updated = False
 
-        except:
-          rospy.logerr("[plan_continously()] {} unavailable".format(service_name))
+        except rospy.ServiceException as e:
+          rospy.logerr("[plan_continously()] {} unavailable. Error: {}".format(service_name, e.what()))
+        except rospy.ROSException as e:
+          rospy.logerr("[plan_continously()] {} ROSExpection occured. Error: {}".format(service_name, e.what()))
 
       self.rate.sleep()
       
-
 
 def main():
   mission_planner_node = MissionPlannerNode()
