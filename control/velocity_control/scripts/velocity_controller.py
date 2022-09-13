@@ -5,19 +5,14 @@ import numpy as np
 import rospy
 import std_msgs.msg
 
-import high_level_action_control_helpers.utilities as utilities
+import velocity_control_helpers.velocity_reference_model as velocity_reference_model
+import velocity_control_helpers.attitude_reference_model as attitude_reference_model
+import velocity_control_helpers.utilities as utilities
 
 from anafi_uav_msgs.msg import AttitudeSetpoint, AnafiTelemetry, EkfOutput, ReferenceStates
-from anafi_uav_msgs.srv import SetControllerState, SetControllerStateResponse
+from std_srvs.srv import SetBool, SetBoolResponse
 
-class HighLevelActionController():
-  """
-  Controller implementing attitude-control of anafi-drone 
-
-  Potential upgrade:
-    - use an action for enabling / disabling the controller
-    - make the number of states less hardcoded
-  """
+class VelocityController():
 
   def __init__(self) -> None:
 
@@ -46,7 +41,7 @@ class HighLevelActionController():
     )
 
     # Set up a service for changing desired states (may be considered as an action in the future - changed to a publisher due to the update rate)
-    rospy.Service("/attitude_controller/set_controller_state", SetControllerState, self.__set_output_state)
+    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self.__enable_controller)
 
     # Set up subscribers 
     rospy.Subscriber("/drone/out/telemetry", AnafiTelemetry, self.__telemetry_cb)
@@ -62,9 +57,7 @@ class HighLevelActionController():
     self.velocities_relative_to_helipad : np.ndarray = np.zeros((3, 1))
 
     self.state_update_timestamp : std_msgs.msg.Time = None
-    self.output_data_timestamp : std_msgs.msg.Time = None
     self.ekf_timestamp : std_msgs.msg.Time = None
-    self.publish_timestamp : std_msgs.msg.Time = None
 
     self.is_controller_active : bool = False
 
@@ -80,17 +73,12 @@ class HighLevelActionController():
     self.reference_velocities = np.array([msg.u_ref, msg.v_ref, msg.w_ref]).T
 
 
-  def __set_output_state(self, msg : SetControllerState):
-    msg_timestamp = msg.header.stamp
+  def __enable_controller(self, msg : SetBool):
+    self.is_controller_active = msg.data
 
-    res = SetControllerStateResponse()
-    if not utilities.is_new_msg_timestamp(self.output_data_timestamp, msg_timestamp):
-      # Old message
-      res.success = False
-    else:
-      self.output_data_timestamp = msg_timestamp
-      self.is_controller_active = msg.desired_controller_state
-      res.success = True 
+    res = SetBoolResponse()
+    res.success = True
+    res.message = "" 
     return res 
 
 
@@ -120,7 +108,7 @@ class HighLevelActionController():
     v_d = np.zeros((4, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
-        new_stamp = rospy.Time.now()
+        stamp = rospy.Time.now()
 
         v_d = self.velocity_reference_model.get_filtered_reference(
           xd_prev=v_d, 
@@ -132,12 +120,8 @@ class HighLevelActionController():
         att_ref = self.attitude_reference_model.get_attitude_reference(
           v_ref=v_d[:2],
           v=self.velocities_relative_to_helipad[:2],
-          ts=utilities.calculate_timestamp_difference_ns(
-            oldest_stamp=self.publish_timestamp, 
-            newest_stamp=new_stamp
-          )
+          ts=stamp
         )
-        self.publish_timestamp = new_stamp
 
         att_ref_3D = np.array([att_ref[0], att_ref[1], 0, v_d[2]]).T 
         att_ref_msg = utilities.pack_attitude_ref_msg(att_ref_3D)
@@ -151,7 +135,7 @@ class HighLevelActionController():
 
 
 def main():
-  node = HighLevelActionController()
+  node = VelocityController()
   node.publish_attitude_ref()
 
 

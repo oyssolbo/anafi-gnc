@@ -2,10 +2,8 @@
 
 import rospy
 import rospkg
-import actionlib
 
-import std_msgs.msg
-
+import pyproj
 import numpy as np
 
 from collections import deque
@@ -13,11 +11,12 @@ from typing import Callable
 
 import anafi_uav_msgs.msg 
 from anafi_uav_msgs.srv import SetPlannedActions, SetPlannedActionsRequest, SetPlannedActionsResponse
-from std_srvs.srv import SetBool, Trigger
 
+import std_msgs.msg
+import sensor_msgs.msg
+from std_srvs.srv import SetBool
 
 import mission_executor_helpers.utilities as utilities
-
 
 class MissionExecutorNode():
   """
@@ -25,7 +24,7 @@ class MissionExecutorNode():
   - store information when an action or service fails to perform some operation, and
     find a method for solving this. Must likely be passed to the planner
   - usage of config file for storing topics/actions/services etc
-  - finding a method for passing locations  
+  - finding a method for passing locations 
   """
   def __init__(self) -> None:
     # Setup node
@@ -36,19 +35,32 @@ class MissionExecutorNode():
 
     # Setup subscribers
     rospy.Subscriber("/drone/out/telemetry", anafi_uav_msgs.msg.AnafiTelemetry, self.__drone_telemetry_cb)
-    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self.__ekf_cb)
+    rospy.Subscriber("/drone/out/gps", sensor_msgs.msg.NavSatFix, self.__drone_gnss_cb)
+    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.EkfOutput, self.__ekf_cb)
 
     # Setup services
     rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self.__set_planned_actions_srv)
 
-    # Setup actions
+    # Setup publishers
+    self.takeoff_pub = rospy.Publisher("/drone/cmd/takeoff", std_msgs.msg.Empty, queue_size=1)
+    self.land_pub = rospy.Publisher("/drone/cmd/land", std_msgs.msg.Empty, queue_size=1)
+
+    # Initializing values
     self.is_action_list_updated : bool = False
     self.action_list : list[str] = []
 
     self.last_telemetry_msg : anafi_uav_msgs.msg.AnafiTelemetry = None 
-    self.pos : np.ndarray = np.ones((3, 1)) # Ones to have the initial error to exceed the tracking requirements
 
     self.is_ordered_to_cancel_current_action : bool = False
+
+    self.velocity_controller_service_name = rospy.get_param("~enable_controller_service_names")["velocity_controller"]
+
+    self.pos_relative_to_helipad : np.ndarray = None
+    self.pos_ecef : np.ndarray = None 
+    self.ned_origin_in_ECEF : np.ndarray = None # The origin of the NED-frame expressed in ECEF
+    self.desired_ecef_coordinates : np.ndarray = None 
+
+    # self.__initialize_gnss()
 
 
   def __drone_telemetry_cb(
@@ -59,15 +71,40 @@ class MissionExecutorNode():
     self.new_telemetry_available = True
 
 
-  def __ekf_cb(
-        self, 
-        msg: anafi_uav_msgs.msg.PointWithCovarianceStamped
-      ) -> None:
-    self.pos = np.array([
-      msg.position.x,
-      msg.position.y,
-      msg.position.z
-    ])
+  def __drone_gnss_cb(self, msg : sensor_msgs.msg.NavSatFix) -> None:
+    msg_timestamp = msg.header.stamp
+
+    if not utilities.is_new_msg_timestamp(self.gnss_timestamp, msg_timestamp):
+      # Old message
+      return
+
+    gnss_status = msg.status
+    if gnss_status == -1:
+      # No position fix
+      return 
+
+    latitude_rad = msg.latitude * np.pi / 180.0
+    longitude_rad = msg.longitude * np.pi / 180.0
+    altitude_m = msg.altitude 
+
+    # Convertion from long / lat / altitude to ECEF
+    ecef = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
+    lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
+    x, y, z = pyproj.transform(lla, ecef, longitude_rad, latitude_rad, altitude_m, radians=True)
+    
+    self.gnss_timestamp = msg_timestamp
+    self.pos_ecef = np.array([x, y, z]).T
+
+
+  def __ekf_cb(self, msg : anafi_uav_msgs.msg.EkfOutput) -> None:
+    msg_timestamp = msg.header.stamp
+
+    if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
+      # Old message
+      return
+    
+    self.ekf_timestamp = msg_timestamp
+    self.pos_relative_to_helipad = np.array([msg.x, msg.y, msg.z]).T
 
 
   def __set_planned_actions_srv(
@@ -90,6 +127,23 @@ class MissionExecutorNode():
     return response
 
 
+  # using this naively, prevented the mission planner to set the mission...
+  # def __initialize_gnss(self):
+  #   # Try to initialize the location of the local frame 
+  #   # Note that it could be possible to have this updated later...
+  #   max_wait_time_s = 20 # Config
+  #   start_time = rospy.Time.now()
+  #   while not rospy.is_shutdown() and utilities.calculate_timestamp_difference_s(start_time, rospy.Time.now()) < max_wait_time_s:
+  #     if self.pos_ecef is not None:
+  #       self.ned_origin_in_ECEF = self.pos_ecef
+  #       rospy.loginfo("Platform's position in ECEF found")
+  #       return True
+  #     self.rate.sleep()
+
+  #   rospy.logerr("Unable to initialize the platform's position in ECEF...")
+  #   return False
+
+
   def __get_next_action_function(self) -> Callable:
     if self.action_list is None or not self.action_list or self.action_list[0] == "":
       self.max_expected_action_time_s = rospy.get_param("~maximum_expected_action_time_s")["idle"]
@@ -97,7 +151,6 @@ class MissionExecutorNode():
 
     self.action_str = deque(self.action_list).popleft()
     self.max_expected_action_time_s = rospy.get_param("~maximum_expected_action_time_s")[self.action_str]
-    self.interface_name = rospy.get_param("~interface_name")[self.action_str]
     
     if self.action_str == "takeoff":
       return self.__takeoff
@@ -134,16 +187,25 @@ class MissionExecutorNode():
     rospy.loginfo("Trying to take off")
 
     try:
+      service_timeout = 2.0
+      
+      # Disable the velocity controller to have a predefined state
       service_response = self.__get_service_interface(
         service_type=SetBool,
-        service_name=self.interface_name,
-        timeout=2.0
-      )()
+        service_name=self.velocity_controller_service_name,
+        timeout=service_timeout 
+      )(SetBool(False))
       if not service_response.success:
-        rospy.loginfo("[__takeoff()] {} denied takeoff".format(self.interface_name))
+        rospy.logerr("[__takeoff()] Cannot disable velocity-controller")
+        raise ValueError()
+
+      # Taking off
+      self.takeoff_pub.publish(std_msgs.msg.Empty())
+      rospy.loginfo("Taking off")
+
 
     except Exception as e:
-      rospy.logerr("[__takeoff()] {} unavailable. Error {}".format(self.interface_name, e.what()))
+      rospy.logerr("[__takeoff()] {} unavailable. Error {}".format(self.velocity_controller_service_name, e.what()))
 
 
   def __land(self):
@@ -152,27 +214,22 @@ class MissionExecutorNode():
     try:
       service_timeout = 0.5 # Short timeout on landing due to strict schedules
       
-      # Disable the attitude controller
+      # Disable the velocity controller
       service_response = self.__get_service_interface(
         service_type=SetBool,
-        service_name="/attitude_controller/service/enable_controller", # Get from config-file
+        service_name=self.velocity_controller_service_name, 
         timeout=service_timeout 
       )(SetBool(False))
       if not service_response.success:
-        rospy.logerr("[__land()] Cannot disable attitude-controller")
+        rospy.logerr("[__land()] Cannot disable velocity-controller")
         raise ValueError()
 
       # Land
-      service_response = self.__get_service_interface(
-        service_type=Trigger,
-        service_name=self.interface_name,
-        timeout=service_timeout 
-      )(Trigger())
-      if not service_response.success:
-        rospy.loginfo("[__land()] {} denied landing".format(self.interface_name))
+      self.land_pub.publish(std_msgs.msg.Empty())
+      rospy.loginfo("Landing")
 
     except Exception as e:
-      rospy.logerr("[__land()] {} unavailable. Error: {}".format(self.interface_name, e.what()))
+      rospy.logerr("[__land()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e.what()))
 
 
   def __track(self) -> None:
@@ -181,18 +238,22 @@ class MissionExecutorNode():
     try:
       service_timeout = 2.0 
       
-      # Enable the attitude controller
+      # Enable the velocity controller
       service_response = self.__get_service_interface(
         service_type=SetBool,
-        service_name="/attitude_controller/service/enable_controller", # Get from config-file
+        service_name=self.velocity_controller_service_name, 
         timeout=service_timeout 
       )(SetBool(True))
       if not service_response.success:
-        rospy.logerr("[__track()] Cannot enable attitude-controller")
+        rospy.logerr("[__track()] Cannot enable velocity-controller")
         raise ValueError()
 
+      # The reference controller is activated
+      # Use a guidance law to eliminate the errors in position
+      # Could set the desired position in guidance
+
     except Exception as e:
-      rospy.logerr("[__track()] {} unavailable. Error: {}".format(self.interface_name, e.what()))
+      rospy.logerr("[__track()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e.what()))
     
   
   def __search(self) -> None:
@@ -208,6 +269,46 @@ class MissionExecutorNode():
 
   def __travel_to(self) -> None:
     rospy.loginfo("Traveling")
+    # Must find a method for loading in the desired positions in NED or ECEF
+    # Could either use the move_relative command developed previously or set the guidance-error accordingly
+    # 
+    # Could pherhaps assume that the desired locations are in NED, which could be translated into ECEF by
+    # knowing the initial origin of the NED-frame 
+    # But this would mean that the guidance-module must have two different states. One for tracking the 
+    # helipad, where one tries to eliminate the positional error estimated using the EKF, and one for 
+    # tracking a global position using ECEF-coordinates 
+
+    # Get the desired location from somewhere
+    desired_location = None 
+    ned_coordinates = self.__load_locations_positions_ned(location=desired_location)
+    
+    if self.ned_origin_in_ECEF is None:
+      rospy.logerr("No ECEF-coordinates are available for NED's origin")
+      return 
+
+    self.desired_ecef_coordinates = ned_coordinates + self.ned_origin_in_ECEF
+
+    # Send the data to the guidance-module 
+    # Discuss with Simen whether the guidance-module should be used
+    # Might be simpler to use the move_relative function developed by Martin Falang
+    relative_movement = self.desired_ecef_coordinates - self.pos_ecef
+
+    # Should have some checks to prevent the drone from crashing into the water etc
+    # Find a method for checking that ned_z > -1.0 or something, where -1.0 means that 
+    # the drone is above the ground
+
+    # The maximum speed could be made relative to the distance the system must travel
+    relative_movement_normed = np.linalg.norm(relative_movement)
+    max_horizontal_speed = 0.5 * np.exp(-relative_movement_normed) + 2.0 * (1 - np.exp(-relative_movement_normed))
+    max_vertical_speed = 0.25 * np.exp(-relative_movement_normed) + 0.75 * (1 - np.exp(-relative_movement_normed))
+
+    self.__move_relative(
+      d_pos=relative_movement, 
+      dpsi=0,
+      max_horizontal_speed=max_horizontal_speed,
+      max_vertical_speed=max_vertical_speed,
+      max_yaw_rotation_speed=np.pi/4
+    )
 
 
   def __drop_bouy(self) -> None:
@@ -242,9 +343,11 @@ class MissionExecutorNode():
     return duration_s < max_wait_time
     
 
-  def __load_locations(self):
+  def __load_locations_positions_ned(self, location : str) -> np.ndarray:
     # Load the locations to travel to
-    return 
+    # These should be loaded in either the ECEF-frame or NED-frame
+    # return rospy.get_param("~locations_ned")[location]
+    return np.zeros((3, 1))
 
 
   def __check_current_action_finished(self) -> bool:
@@ -270,8 +373,9 @@ class MissionExecutorNode():
 
     if self.action_str == "track":
       # Check that the error is small enough
-      pos_error_normed = np.linalg.norm(self.pos)
-      return pos_error_normed < 0.25 # Config-file
+      pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad)
+      max_pos_tracking_error_normed = rospy.get_param("~max_pos_tracking_error_normed", default=0.25)
+      return pos_error_normed < max_pos_tracking_error_normed 
 
     # The different actions are set as True, since these are not implemented
     if self.action_str == "search":
@@ -281,12 +385,43 @@ class MissionExecutorNode():
       return True
     
     if self.action_str == "travel_to":
-      return True 
+      # Check whether the drone is close enough to the desired point of interest
+      # May become slightly problematic when travelling to the platform, as the error might be 
+      # too large for the tracking to handle
+      horizontal_radius_of_acceptance = rospy.get_param("~horizontal_radius_of_acceptance", default=5.0)
+      vertical_radius_of_acceptance = rospy.get_param("~vertical_radius_of_acceptance", default=7.5)
+      
+      if self.desired_ecef_coordinates is None:
+        rospy.logerr("[__check_current_action_finished()] Desired ECEF coordinates are None")
+        return False
+
+      pos_error_ecef = self.desired_ecef_coordinates - self.pos_ecef
+      return np.linalg.norm(pos_error_ecef[:2]) <= horizontal_radius_of_acceptance and np.abs(pos_error_ecef) <= vertical_radius_of_acceptance
     
     if self.action_str == "drop_bouy":
       return True
 
     return False
+
+  def __move_relative(
+        self, 
+        d_pos                 : np.ndarray,
+        dpsi                  : float       = 0,
+        max_horizontal_speed  : float       = 0.5, 
+        max_vertical_speed    : float       = 0.5, 
+        max_yaw_rotation_speed: float       = np.pi/4
+      ) -> None:
+    msg = anafi_uav_msgs.msg.PositionSetpointRelative()
+    msg.header.stamp = rospy.Time.now()
+    msg.dx = d_pos[0]
+    msg.dy = d_pos[1]
+    msg.dz = d_pos[2]
+    msg.dpsi = dpsi
+    msg.max_horizontal_speed = max_horizontal_speed
+    msg.max_vertical_speed = max_vertical_speed
+    msg.max_yaw_rotation_speed = max_yaw_rotation_speed
+
+    self._move_relative_publisher.publish(msg)
 
 
   def __cancel_action(self) -> None:
@@ -327,7 +462,7 @@ class MissionExecutorNode():
       passed_time_s = utilities.calculate_timestamp_difference_s(start_time, current_time)
 
       is_current_action_finished = self.__check_current_action_finished()     
-      is_action_cancellable = (passed_time_s > self.max_expected_action_time_s) or (self.is_ordered_to_cancel_current_action) 
+      # is_action_cancellable = (passed_time_s > self.max_expected_action_time_s) or (self.is_ordered_to_cancel_current_action) 
 
       if is_current_action_finished:# or is_action_cancellable: 
         # if is_action_cancellable:

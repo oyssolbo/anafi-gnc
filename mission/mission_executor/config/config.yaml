@@ -14,14 +14,20 @@ maximum_expected_action_time_s:
 
 
 interface_name:
-  takeoff: "/high_level_controller/service/request_take_off"
-  landing: "/high_level_controller/service/request_landing"
+  takeoff: "/drone/cmd/takeoff"
+  landing: "/drone/cmd/land"
 
 
 enable_controller_service_names:
-  attitude_controller: "/attitude_controller/service/enable_controller"
+  velocity_controller: "/velocity_controller/service/enable_controller"
 
+
+horizontal_radius_of_acceptance: 5.0  # When the drone is within 5 meters from the desired point, it has travelled to the destination
+vertical_radius_of_acceptance: 7.5    # Less strict about the vertical position
+
+max_pos_tracking_error_normed: 0.25
 
 locations_ned:
   helipad: [0, 0, 0]
+
 
