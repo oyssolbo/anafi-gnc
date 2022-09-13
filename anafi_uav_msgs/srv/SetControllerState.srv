@@ -1,7 +1,0 @@
-# May want to change name
-
-Header header
-
-bool desired_controller_state
----
-bool success

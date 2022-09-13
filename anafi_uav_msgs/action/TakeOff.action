@@ -1,8 +1,8 @@
 # Goal: Position to reach
+float32 goal_z_ned      # [m]
 ---
 # Result: Final position
-int32 final_z_ned     # [m]
-bool is_hovering
+float32 result_z_ned     # [m]
 ---
 # Feedback: Current position
-int32 z_ned           # [m]
+float32 feedback_z_ned   # [m]

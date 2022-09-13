@@ -5,14 +5,12 @@ import numpy as np
 import rospy
 import std_msgs.msg
 
-import attitude_control_helpers.velocity_reference_model as velocity_reference_model
-import attitude_control_helpers.attitude_reference_model as attitude_reference_model
-import attitude_control_helpers.utilities as utilities
+import high_level_action_control_helpers.utilities as utilities
 
 from anafi_uav_msgs.msg import AttitudeSetpoint, AnafiTelemetry, EkfOutput, ReferenceStates
-from std_srvs.srv import SetBool, SetBoolResponse
+from anafi_uav_msgs.srv import SetControllerState, SetControllerStateResponse
 
-class AttitudeController():
+class HighLevelActionController():
   """
   Controller implementing attitude-control of anafi-drone 
 
@@ -48,7 +46,7 @@ class AttitudeController():
     )
 
     # Set up a service for changing desired states (may be considered as an action in the future - changed to a publisher due to the update rate)
-    rospy.Service("/attitude_controller/service/enable_controller", SetBool, self.__enable_controller)
+    rospy.Service("/attitude_controller/set_controller_state", SetControllerState, self.__set_output_state)
 
     # Set up subscribers 
     rospy.Subscriber("/drone/out/telemetry", AnafiTelemetry, self.__telemetry_cb)
@@ -64,6 +62,7 @@ class AttitudeController():
     self.velocities_relative_to_helipad : np.ndarray = np.zeros((3, 1))
 
     self.state_update_timestamp : std_msgs.msg.Time = None
+    self.output_data_timestamp : std_msgs.msg.Time = None
     self.ekf_timestamp : std_msgs.msg.Time = None
     self.publish_timestamp : std_msgs.msg.Time = None
 
@@ -81,12 +80,17 @@ class AttitudeController():
     self.reference_velocities = np.array([msg.u_ref, msg.v_ref, msg.w_ref]).T
 
 
-  def __enable_controller(self, msg : SetBool):
-    self.is_controller_active = msg.data
+  def __set_output_state(self, msg : SetControllerState):
+    msg_timestamp = msg.header.stamp
 
-    res = SetBoolResponse()
-    res.success = True
-    res.message = "" 
+    res = SetControllerStateResponse()
+    if not utilities.is_new_msg_timestamp(self.output_data_timestamp, msg_timestamp):
+      # Old message
+      res.success = False
+    else:
+      self.output_data_timestamp = msg_timestamp
+      self.is_controller_active = msg.desired_controller_state
+      res.success = True 
     return res 
 
 
@@ -147,7 +151,7 @@ class AttitudeController():
 
 
 def main():
-  node = AttitudeController()
+  node = HighLevelActionController()
   node.publish_attitude_ref()
 
 

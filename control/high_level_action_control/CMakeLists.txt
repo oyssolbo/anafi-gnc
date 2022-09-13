@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(attitude_control)
+project(high_level_action_control)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -10,7 +10,6 @@ project(attitude_control)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   anafi_uav_msgs
-  std_srvs
 )
 
 catkin_package(

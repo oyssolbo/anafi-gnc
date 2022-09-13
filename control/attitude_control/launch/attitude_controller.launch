@@ -4,7 +4,6 @@
     pkg="attitude_control"
     type="attitude_controller.py"
     output="screen">
-    <rosparam command="load" file="$(find attitude_control)/config/attitude_control.yaml" />
-    <!-- <param name="config_file" value="attitude_control.yaml" /> -->
+    <rosparam command="load" file="$(find attitude_control)/config/config.yaml" />
   </node>
 </launch>

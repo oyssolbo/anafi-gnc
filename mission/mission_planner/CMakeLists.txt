@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(action_executor)
+project(mission_planning)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -8,6 +8,7 @@ project(action_executor)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  roscpp
   rospy
   anafi_uav_msgs
 )
@@ -158,11 +159,10 @@ include_directories(
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-catkin_install_python(PROGRAMS
-  scripts/action_executor.py
-  scripts/utilities.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+# catkin_install_python(PROGRAMS
+#   scripts/action_planner.py
+#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+# )
 
 
 ## Mark executables for installation
@@ -186,10 +186,9 @@ catkin_install_python(PROGRAMS
 #   PATTERN ".svn" EXCLUDE
 # )
 
-## Mark other files for installation (e.g. launch and bag files, etc.)
+# Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
-#   # myfile1
-#   # myfile2
+#   DIRECTORY launch
 #   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 # )
 

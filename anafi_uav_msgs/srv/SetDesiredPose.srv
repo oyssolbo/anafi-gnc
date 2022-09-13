@@ -1,13 +1,13 @@
 # Following the notation in Fossen 2021
 
-Header header
+string coordinate_frame # Alternatives: [ECEF, NED, RELATIVE_TO_PLATFORM]
 
-# Drone position
+# Drone desired position
 float32 x       # [m]
 float32 y       # [m]
 float32 z       # [m]
 
-# Drone heading
+# Drone desired heading
 float32 psi     # [rad]  
 ---
-bool is_set
+bool success
