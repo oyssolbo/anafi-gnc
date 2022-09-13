@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 
+import rospy
+
 import numpy as np
 
-import std_msgs
-
-def calculate_timestamp_difference_ns(
-      oldest_stamp : std_msgs.msg.Time,
-      newest_stamp : std_msgs.msg.Time
+def calculate_timestamp_difference_s(
+      oldest_stamp : rospy.Time,
+      newest_stamp : rospy.Time
     ) -> float:
   """
   Calculates the time difference between two timestamps
@@ -15,17 +15,15 @@ def calculate_timestamp_difference_ns(
   """
   if oldest_stamp is None:
     return 0.0
-  sec_diff = newest_stamp.sec - oldest_stamp.sec
-  ns_diff = newest_stamp.nsec - oldest_stamp.nsec
-  return (sec_diff * 1e9) + ns_diff
+  return (newest_stamp - oldest_stamp).to_sec()
 
 
 def is_new_msg_timestamp(
-      own_timestamp : std_msgs.msg.Time, 
-      msg_timestamp : std_msgs.msg.Time
+      own_timestamp : rospy.Time, 
+      msg_timestamp : rospy.Time
     ) -> bool:
   if (own_timestamp is not None):
-    if calculate_timestamp_difference_ns(oldest_stamp=own_timestamp, newest_stamp=msg_timestamp) <= 0.0:
+    if calculate_timestamp_difference_s(oldest_stamp=own_timestamp, newest_stamp=msg_timestamp) <= 0.0:
       # Old message
       return False 
   return True

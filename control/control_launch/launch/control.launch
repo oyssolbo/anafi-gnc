@@ -1,10 +1,6 @@
 <?xml version="1.0"?>
 <launch>
 
-  <!-- Configuration parameters - change these -->
-  <param name="/velocity_controller/odometry_topic" value="/odometry/filtered" />
-  <param name="/velocity_controller/thrust_topic" value="/auv/thruster_manager/input" />
-
   <!-- Controller nodes -->
-  <include file="$(find attitude_controller)/launch/attitude_controller.launch" pass_all_args="true"/>
+  <include file="$(find velocity_control)/launch/velocity_controller.launch" pass_all_args="true"/>
 </launch>
