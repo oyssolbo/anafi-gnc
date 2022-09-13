@@ -77,7 +77,7 @@ class MissionPlannerNode():
         except rospy.ServiceException as e:
           rospy.logerr("[plan_continously()] {} unavailable. Error: {}".format(service_name, e.what()))
         except rospy.ROSException as e:
-          rospy.logerr("[plan_continously()] {} ROSExpection occured. Error: {}".format(service_name, e.what()))
+          rospy.logerr("[plan_continously()] {} ROSExpection occured. Error: {}".format(service_name, e))
 
       self.rate.sleep()
       
