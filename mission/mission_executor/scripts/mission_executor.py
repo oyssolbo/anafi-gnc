@@ -12,7 +12,7 @@ from collections import deque
 from typing import Callable
 
 import anafi_uav_msgs.msg 
-from anafi_uav_msgs.srv import SetPlannedActions, SetPlannedActionsResponse
+from anafi_uav_msgs.srv import SetPlannedActions, SetPlannedActionsRequest, SetPlannedActionsResponse
 from std_srvs.srv import SetBool, Trigger
 
 
@@ -39,7 +39,7 @@ class MissionExecutorNode():
     rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self.__ekf_cb)
 
     # Setup services
-    rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self.__set_planned_actions_srv_cb)
+    rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self.__set_planned_actions_srv)
 
     # Setup actions
     self.is_action_list_updated : bool = False
@@ -70,9 +70,9 @@ class MissionExecutorNode():
     ])
 
 
-  def __set_planned_actions_srv_cb(
+  def __set_planned_actions_srv(
         self, 
-        request : SetPlannedActions
+        request : SetPlannedActionsRequest
       ) -> SetPlannedActionsResponse:
     response = SetPlannedActionsResponse()
 
@@ -142,8 +142,8 @@ class MissionExecutorNode():
       if not service_response.success:
         rospy.loginfo("[__takeoff()] {} denied takeoff".format(self.interface_name))
 
-    except:
-      rospy.logerr("[__takeoff()] {} unavailable".format(self.interface_name))
+    except Exception as e:
+      rospy.logerr("[__takeoff()] {} unavailable. Error {}".format(self.interface_name, e.what()))
 
 
   def __land(self):
@@ -171,8 +171,8 @@ class MissionExecutorNode():
       if not service_response.success:
         rospy.loginfo("[__land()] {} denied landing".format(self.interface_name))
 
-    except:
-      rospy.logerr("[__land()] {} unavailable".format(self.interface_name))
+    except Exception as e:
+      rospy.logerr("[__land()] {} unavailable. Error: {}".format(self.interface_name, e.what()))
 
 
   def __track(self) -> None:
@@ -191,8 +191,8 @@ class MissionExecutorNode():
         rospy.logerr("[__track()] Cannot enable attitude-controller")
         raise ValueError()
 
-    except:
-      rospy.logerr("[__track()] {} unavailable".format(self.interface_name))
+    except Exception as e:
+      rospy.logerr("[__track()] {} unavailable. Error: {}".format(self.interface_name, e.what()))
     
   
   def __search(self) -> None:
