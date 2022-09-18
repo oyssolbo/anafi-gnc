@@ -12,7 +12,9 @@ find_package(catkin REQUIRED COMPONENTS
   anafi_uav_msgs
   std_srvs
   std_msgs
+  geometry_msgs
   sensor_msgs
+  olympe_bridge
 )
 
 ## System dependencies are found with CMake's conventions
