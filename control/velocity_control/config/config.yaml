@@ -1,6 +1,5 @@
 node_name: "attitude_controller_node"
-
-rate_Hz: 20
+node_rate: 20
 
 attitude_limits:
   pitch: [-5, 5]
