@@ -10,131 +10,72 @@ drone:
                     0.000000000000000000e+00, 9.326606388000454899e+02, 3.753484894513629229e+02,
                     0.000000000000000000e+00, 0.000000000000000000e+00, 1.000000000000000000e+00]
   
-
-attitude_controller:
-  rate_Hz: 20
-
-  attitude_limits:
-    pitch: [-5, 5]
-    roll: [-5, 5]
-
-  velocity_reference_model:
-    omegas: [10, 10]
-    zetas: [1, 1]
-
-
-guidance:
-  rate_Hz: 20
-  velocity_limits:
-    vx: [-0.3, 0.3]
-    vy: [-0.3, 0.3]
-    vz: [-0.1, 0.1]
-  pp:
-    ua_max: 2.5     # Approach speed [m/s]
-    lookahead: 0.25 # [m] 
-                    # Smaller lookahead gives more aggressive guidance
-  pid:
-    x_axis:
-      kp: 0.5
-      ki: 0
-      kd: 0
-    y_axis:
-      kp: 0.5
-      ki: 0
-      kd: 0
-    z_axis:
-      kp: 0.2
-      ki: 0
-      kd: 0
-
-
-anafi_interface:  
-  topics:
+topics:
+  olympe_bridge:
     output:
-      telemetry: "/drone/out/telemetry"
-      gnss: "/drone/out/gps"
-      camera: "/drone/out/image_rect_color"
-    input:
-      takeoff: "/drone/cmd/takeoff"
-      land: "/drone/cmd/land"
-      attitude_setpoint: "drone/cmd/set_attitude"
-      position_setpoint: "drone/cmd/set_position_relative"
-      saturation_limits: "drone/cmd/set_saturation_limits"
-  attitude_offsets:
-    roll: -0.9
-    pitch: -5.9
-    yaw: 0
+      image:              "/anafi/image"              # geometry_msgs.msg.Image
+      time:               "/anafi/time"               # std_msgs.msg.Time
 
+      height:             "/anafi/height"             # std_msgs.msg.Float32
+      location:           "/anafi/location"           # geometry_msgs.msg.PointStamped
+      attitude:           "/anafi/attitude"           # geometry_msgs.msg.QuaternionStamped
+      pose:               "/anafi/pose"               # geometry_msgs.msg.PoseStamped
+      twist_body:         "/anafi/twist_body"         # geometry_msgs.msg.TwistStamped
+      optical_flow_speed: "/anafi/optical_flow_speed" # geometry_msgs.msg.Vector3Stamped
+      odometry:           "/anafi/odometry"           # nav_msgs.msg.Odometry
 
-ground_truth:
-  topics:
-    drone_pose_ned:
-      sim: "/ground_truth/ned_frame/drone_pose"
-      real: /qualisys/anafi/pose
+      wifi_throughput:    "/anafi/link_goodput"       # std_msgs.msg.UInt16
+      wifi_quality:       "/anafi/link_quality"       # std_msgs.msg.UInt8
+      wifi_rssi:          "/anafi/wifi_rssi"          # std_msgs.msg.Int8
 
-    helipad_pose_ned:
-      sim: "/ground_truth/ned_frame/helipad_pose"
-      real: /qualisys/helipad/pose
+      battery:            "/anafi/battery"            # std_msgs.msg.UInt8
+      state:              "/anafi/state"              # std_msgs.msg.String
 
-    drone_pose_helipad_frame:
-      sim: "/ground_truth/helipad_frame/drone_pose"
-      real: "/ground_truth/helipad_frame/drone_pose"
+    input:      
+      land:               "/anafi/land"               # std_msgs.msg.Empty
+      takeoff:            "/anafi/takeoff"            # std_msgs.msg.Empty
+      kill_motors:        "/anafi/emergency"          # std_msgs.msg.Empty
 
-    helipad_pose_body_frame:
-      sim: "/ground_truth/body_frame/helipad_pose"
-      real: "/ground_truth/body_frame/helipad_pose"
+      cmd_attitude:       "/anafi/cmd_rpyt"           # olympe_bridge.msg.AttitudeSetpoint
+      cmd_move_to_ecef:   "/anafi/cmd_moveto"         # olympe_bridge.msg.MoveToCommand
+      cmd_move_relative:  "/anafi/cmd_moveby"         # olympe_bridge.msg.MoveToCommand
+    
+  ground_truth:
+    output:
+      drone_pose_ned:
+        sim:              "/ground_truth/ned_frame/drone_pose"
+        real:             "/qualisys/anafi/pose"
 
+      helipad_pose_ned:
+        sim:              "/ground_truth/ned_frame/helipad_pose"
+        real:             "/qualisys/helipad/pose"
 
-perception:
+      drone_pose_helipad_frame:
+        sim:              "/ground_truth/helipad_frame/drone_pose"
+        real:             "/ground_truth/helipad_frame/drone_pose"
+
+      helipad_pose_body_frame:
+        sim:              "/ground_truth/body_frame/helipad_pose"
+        real:             "/ground_truth/body_frame/helipad_pose"
+
   ekf:
-    ekf:
-      output:
-        topic_name: /estimate/ekf
-      input:
-        topic_name: /drone/out/ekf_input
-      dynamic_model: constant_velocity_no_attitude
-      measurement_models: [drone_velocity, dnn_cv_position, tcv_position, dnn_cv_position_xy]
-      dt: 0.04
-
-    dynamic_models:
-      constant_velocity_no_attitude:
-        input:
-          type: none
-        output_states: position
-        init_values:
-          x0: [0, 0, 0, 0, 0, 0]
-          P0: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-        sigmas: [0.03, 0.03, 0.03, 0.01, 0.01, 0.01]
-        output_type: perception.msg.PointWithCovarianceStamped
-
-    measurements:
-      dnn_cv_position:
-        topic_name: /estimate/dnn_cv/position
-        sigmas: [0.5, 0.5, 1] # std. dev. in x,y,z (m)
-      dnn_cv_position_xy:
-        topic_name: /estimate/dnn_cv/position
-        sigmas: [0.5, 0.5] # std. dev. in x,y,z (m)
-      drone_velocity:
-        topic_name: /drone/out/telemetry
-        sigmas: [0.4, 0.4, 0.4] # std. dev. in v_x, v_y, v_z (m/s)
-      tcv_position:
-        topic_name: /estimate/tcv/pose
-        sigmas: [0.5, 0.5, 0.5] # std. dev. in x,y,z
-
-  tcv:
-    shi_tomasi_params:
-      path: "data/shi_tomasi_params.yaml"
-
-    hough_circle_params:
-      path: "data/hough_circle_params.yaml"
-
-    feature_dists_metric:
-      path: "data/helipad_dists_origin_center_enu_metric.txt"
+    output:
+      estimate:           "/estimate/ekf" # change this to /ekf/estimate
+    input:
+      topic_name:         "/drone/out/ekf_input"
 
   dnn-cv:
-    topics:
-      input:
-        bounding_boxes: "/darknet_ros/bounding_boxes"
-      output:
-        position: "/estimate/dnn_cv/position"
-        heading: "/estimate/dnn_cv/heading"
+    output:
+      position:           "/estimate/dnn_cv/position"
+      heading:            "/estimate/dnn_cv/heading"
+    input:
+      bounding_boxes:     "/darknet_ros/bounding_boxes"
+
+  guidance:
+    velocity_reference:   "/guidance/velocity_reference"
+
+
+services:
+  controllers:
+    velocity_control:
+      enable_controller:   "/velocity_controller/service/enable_controller"  # std_srvs.srv.SetBool
