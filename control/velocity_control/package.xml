@@ -9,6 +9,10 @@
 
   <depend>anafi_uav_msgs</depend>
   <depend>std_srvs</depend>
+  <depend>olympe_bridge</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>std_msgs</depend>
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>rospy</build_depend>
