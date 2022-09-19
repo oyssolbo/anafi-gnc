@@ -1,0 +1,3 @@
+{bilateral_diameter: 9, dp: 1, gaussian_kernel: 5, max_radius: 500, median_kernel: 11,
+  method: 3, min_dist: 1000, min_radius: 50, param1: 40, param2: 70, use_bilateral_blur: true,
+  use_gaussian_blur: true, use_median_blur: true, best_index: 21}

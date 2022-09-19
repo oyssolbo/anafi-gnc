@@ -1,0 +1,8 @@
+shi_tomasi_params:
+  path: "data/shi_tomasi_params.yaml"
+
+hough_circle_params:
+  path: "data/hough_circle_params.yaml"
+
+feature_dists_metric:
+  path: "data/helipad_dists_origin_center_enu_metric.txt"
