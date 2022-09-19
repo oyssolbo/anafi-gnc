@@ -1,8 +1,16 @@
 
 import cv2 as cv
 import numpy as np
-from parameter_optimization.circle_detector_optimizer import CircleDetector
-from parameter_optimization.corner_detector_optimizer import CornerDetector
+
+# import parameter_optimization.corner_detector_evaluator
+# import parameter_optimization.corner_detector_optimizer
+
+# from parameter_optimization import circle_detector_optimizer, corner_detector_evaluator
+
+from tcv_helpers.parameter_optimization.circle_detector_optimizer import CircleDetector
+from tcv_helpers.parameter_optimization.corner_detector_optimizer import CornerDetector
+# from circle_detector_optimizer import CircleDetector
+# from parameter_optimization.corner_detector_optimizer import CornerDetector
 
 HSV_SIM_GREEN = [120, 100, 30]
 

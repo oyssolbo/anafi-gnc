@@ -3,7 +3,7 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 
-import perception.homography
+from . import homography
 
 class PoseRecovery():
 
