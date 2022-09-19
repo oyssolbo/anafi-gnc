@@ -13,6 +13,7 @@ import numpy as np
 import tcv_helpers.feature_detector as feature_detector
 import tcv_helpers.pose_recovery as pose_recovery
 
+from tcv_helpers import feature_detector, pose_recovery
 import perception.msg
 
 class TcvPoseEstimator():
