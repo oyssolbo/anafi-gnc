@@ -9,8 +9,13 @@ import velocity_control_helpers.velocity_reference_model as velocity_reference_m
 import velocity_control_helpers.attitude_reference_model as attitude_reference_model
 import velocity_control_helpers.utilities as utilities
 
-from anafi_uav_msgs.msg import AttitudeSetpoint, AnafiTelemetry, EkfOutput, ReferenceStates
+from geometry_msgs.msg import TwistStamped
+from olympe_bridge.msg import AttitudeCommand
+from anafi_uav_msgs.msg import EkfOutput
 from std_srvs.srv import SetBool, SetBoolResponse
+
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 class VelocityController():
 
@@ -18,7 +23,7 @@ class VelocityController():
 
     # Initializing node
     node_name = rospy.get_param("~node_name", default = "attitude_controller_node")
-    node_rate = rospy.get_param("~rate_Hz", default = 20)
+    node_rate = rospy.get_param("~node_rate", default = 20)
     self.dt = 1.0 / node_rate 
 
     rospy.init_node(node_name)
@@ -41,36 +46,39 @@ class VelocityController():
     )
 
     # Setup services
+    # services = rospy.get_param("services")
     rospy.Service("/velocity_controller/service/enable_controller", SetBool, self.__enable_controller)
 
     # Setup subscribers 
-    rospy.Subscriber("/drone/out/telemetry", AnafiTelemetry, self.__telemetry_cb)
+    # topics = rospy.get_param("topics")
+    rospy.Subscriber("/anafi/twist_body" , TwistStamped, self.__twist_cb)
     rospy.Subscriber("/estimate/ekf", EkfOutput, self.__ekf_cb)
-    rospy.Subscriber("/guidance/velocity_reference", ReferenceStates, self.__set_reference_velocities)
+    rospy.Subscriber("/guidance/velocity_reference", TwistStamped, self.__reference_velocities_cb)
 
     # Setup publishers
-    self.attitude_ref_pub = rospy.Publisher("/drone/cmd/set_attitude", AttitudeSetpoint, queue_size=1)
+    self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
 
     # Initial values
     self.reference_velocities : np.ndarray = np.zeros((3, 1))
     self.velocities_body : np.ndarray = np.zeros((3, 1))
     self.velocities_relative_to_helipad : np.ndarray = np.zeros((3, 1))
 
-    self.state_update_timestamp : std_msgs.msg.Time = None
     self.ekf_timestamp : std_msgs.msg.Time = None
+    self.twist_timestamp : std_msgs.msg.Time = None
+    self.guidance_timestamp : std_msgs.msg.Time = None
 
     self.is_controller_active : bool = False
 
 
-  def __set_reference_velocities(self, msg : ReferenceStates):
+  def __reference_velocities_cb(self, msg : TwistStamped):
     msg_timestamp = msg.header.stamp
 
-    if not utilities.is_new_msg_timestamp(self.state_update_timestamp, msg_timestamp):
+    if not utilities.is_new_msg_timestamp(self.guidance_timestamp, msg_timestamp):
       # Old message
       return
 
-    self.state_update_timestamp = msg_timestamp
-    self.reference_velocities = np.array([msg.u_ref, msg.v_ref, msg.w_ref]).T
+    self.guidance_timestamp = msg_timestamp
+    self.reference_velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
 
 
   def __enable_controller(self, msg : SetBool):
@@ -93,18 +101,20 @@ class VelocityController():
     self.velocities_relative_to_helipad = np.array([msg.u_r, msg.v_r, msg.w_r]).T
 
 
-  def __telemetry_cb(self, msg : AnafiTelemetry) -> None:
+  def __twist_cb(self, msg : TwistStamped) -> None:
     msg_timestamp = msg.header.stamp
 
-    if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
+    if not utilities.is_new_msg_timestamp(self.twist_timestamp, msg_timestamp):
       # Old message
       return
     
-    self.ekf_timestamp = msg_timestamp
-    self.velocities_body = np.array([msg.u, msg.v, msg.w]).T
+    self.twist_timestamp = msg_timestamp
+    self.velocities_body = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T # Body-velocities are not used atm
 
 
   def publish_attitude_ref(self) -> None:
+    attitude_cmd_msg = AttitudeCommand()
+
     v_d = np.zeros((4, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
@@ -123,9 +133,14 @@ class VelocityController():
           ts=stamp
         )
 
-        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, v_d[2]]).T 
-        att_ref_msg = utilities.pack_attitude_ref_msg(att_ref_3D)
-        self.attitude_ref_pub.publish(att_ref_msg)
+        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, v_d[2]], dtype=np.float64).T 
+        attitude_cmd_msg.roll = rospy.Time.now()
+        attitude_cmd_msg.roll = np.rad2deg(att_ref_3D[0])   # Message requires rpy in deg
+        attitude_cmd_msg.pitch = np.rad2deg(att_ref_3D[1])
+        attitude_cmd_msg.yaw = np.rad2deg(att_ref_3D[2])
+        attitude_cmd_msg.gaz = att_ref_3D[3]
+
+        self.attitude_ref_pub.publish(attitude_cmd_msg)
 
       else:
         self.reference_velocities = np.zeros((3, 1))

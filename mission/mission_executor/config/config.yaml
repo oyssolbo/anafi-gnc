@@ -1,12 +1,16 @@
 node_name: "mission_executor_node"
 node_rate: 10
 
+testing:
+  is_mission_testing: true
+  mission_test_id: 5
 
 maximum_expected_action_time_s:
   communicate: 5
-  takeoff: 10
-  land: 10
+  takeoff: 5
+  land: 5
   drop_bouya: 10
+  move_relative: 15
   travel_to: 120
   track: 120
   search: 180

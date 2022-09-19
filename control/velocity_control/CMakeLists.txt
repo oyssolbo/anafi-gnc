@@ -11,6 +11,10 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   anafi_uav_msgs
   std_srvs
+  olympe_bridge
+  geometry_msgs
+  nav_msgs
+  std_msgs
 )
 
 catkin_package(

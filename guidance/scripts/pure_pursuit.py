@@ -6,12 +6,16 @@ import sensor_msgs.msg
 import pyproj
 from enum import Enum
 
+from geometry_msgs.msg import TwistStamped
+
 from anafi_uav_msgs.msg import EkfOutput, ReferenceStates
 from anafi_uav_msgs.srv import SetDesiredPose, SetDesiredPoseRequest, SetDesiredPoseResponse
 
 import numpy as np
 import guidance_helpers.utilities as utilities
 
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 class GuidanceState(Enum):
   ECEF = 0
@@ -34,12 +38,12 @@ class PurePursuitGuidanceLaw():
 
     # Set up subscribers 
     rospy.Subscriber("/estimate/ekf", EkfOutput, self.__ekf_cb)
-    rospy.Subscriber("/drone/out/gps", sensor_msgs.msg.NavSatFix, self.__drone_gnss_cb)
+    rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self.__drone_gnss_cb)
     # rospy.Subscriber("/platform/out/gps", sensor_msgs.msg.NavSatFix, self.__target_gnss_cb) # Could be nice to subscribe to the estimated GNSS data about the target
     # rospy.Subscriber("/estimate/target_velocity", anafi_uav_msgs.msg.) # Would be nice to predict target movement
 
     # Set up publishers
-    self.reference_velocity_publisher = rospy.Publisher("/guidance/velocity_reference", ReferenceStates, queue_size=1)
+    self.reference_velocity_publisher = rospy.Publisher("/guidance/velocity_reference", TwistStamped, queue_size=1)
 
     # Set up services
     rospy.Service("/guidance/service/desired_pos", SetDesiredPose, self.__set_pos)
@@ -156,8 +160,9 @@ class PurePursuitGuidanceLaw():
     Generate a velocity reference from a position error using the pure
     pursuit guidance law as defined in Fossen 2021.
     """
+    twist_ref_msg = TwistStamped()
+
     zeros_3_1 = np.zeros((3, 1))
-    reference_msg = ReferenceStates()
     vel_target = zeros_3_1 # Possible extension to use constant bearing guidance in the future
 
     while not rospy.is_shutdown():
@@ -175,22 +180,22 @@ class PurePursuitGuidanceLaw():
       vel_ref_y = self.__clamp(vel_ref_unclamped[1], self.vy_limits)
       vel_ref_z = self.__clamp(vel_ref_unclamped[2], self.vz_limits)
 
-      reference_msg.u_ref = vel_ref_x
-      reference_msg.v_ref = vel_ref_y
-      reference_msg.w_ref = vel_ref_z
+      twist_ref_msg.twist.linear.x = vel_ref_x
+      twist_ref_msg.twist.linear.y = vel_ref_y
+      twist_ref_msg.twist.linear.z = vel_ref_z
 
-      self.reference_velocity_publisher.publish(reference_msg)
+      self.reference_velocity_publisher.publish(twist_ref_msg)
 
       # Should have some logic for switching to the ECEF-coordinate frame in case 
       # the error becomes too large. Requires the guidance to have an overview of 
       # the target position
-      max_error = rospy.get_param("~max_error_normed", default=10)
-      if self.guidance_state == GuidanceState.RELATIVE_TO_HELIPAD and pos_error_normed > max_error:
-        # May consider requesting ECEF-position of the target
-        # Idle, such that it will not move until the position is updated
-        # self.guidance_state = GuidanceState.IDLE
-        # self.__request_target_ecef_position() # Set the state to ECEF
-        pass
+      # max_error = rospy.get_param("~max_error_normed", default=10)
+      # if self.guidance_state == GuidanceState.RELATIVE_TO_HELIPAD and pos_error_normed > max_error:
+      #   # May consider requesting ECEF-position of the target
+      #   # Idle, such that it will not move until the position is updated
+      #   # self.guidance_state = GuidanceState.IDLE
+      #   # self.__request_target_ecef_position() # Set the state to ECEF
+      #   pass
 
         # Might consider having the action-executor to perform this action
 
