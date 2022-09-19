@@ -10,8 +10,8 @@ import time
 import cv2 as cv
 import numpy as np
 
-import utilities.feature_detector as feature_detector
-import utilities.pose_recovery as pose_recovery
+import tcv_helpers.feature_detector as feature_detector
+import tcv_helpers.pose_recovery as pose_recovery
 
 import perception.msg
 
