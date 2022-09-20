@@ -14,7 +14,7 @@ import tcv_helpers.feature_detector as feature_detector
 import tcv_helpers.pose_recovery as pose_recovery
 
 from tcv_helpers import feature_detector, pose_recovery
-import perception.msg
+from anafi_uav_msgs.msg import EulerPose
 
 class TcvPoseEstimator():
 
@@ -30,7 +30,7 @@ class TcvPoseEstimator():
         script_dir = os.path.dirname(os.path.realpath(__file__))
 
         try:
-            with open(f"{script_dir}/../../config/{config_file}") as f:
+            with open(f"{script_dir}/../config/{config_file}") as f:
                 self.config = yaml.safe_load(f)
         except Exception as e:
             rospy.logerr(f"Failed to load config: {e}")
@@ -54,25 +54,25 @@ class TcvPoseEstimator():
         self.new_image_available = False
         self.processing_image = False
 
-        rospy.Subscriber("/drone/out/image_rect_color", sensor_msgs.msg.Image,
+        rospy.Subscriber("/anafi/image", sensor_msgs.msg.Image,
             self._new_image_cb
         )
 
         self.feature_dists_metric = np.loadtxt(
-            f"{script_dir}/../../{self.config['feature_dists_metric']['path']}"
+            f"{script_dir}/../{self.config['feature_dists_metric']['path']}"
         )
 
-        with open(f"{script_dir}/../../{self.config['shi_tomasi_params']['path']}") as f:
+        with open(f"{script_dir}/../{self.config['shi_tomasi_params']['path']}") as f:
             shi_tomasi_params = yaml.safe_load(f)
 
-        with open(f"{script_dir}/../../{self.config['hough_circle_params']['path']}") as f:
+        with open(f"{script_dir}/../{self.config['hough_circle_params']['path']}") as f:
             hough_circle_params = yaml.safe_load(f)
 
         self.corner_detector = feature_detector.FeatureDetector(shi_tomasi_params, hough_circle_params)
         self.pose_recoverer = pose_recovery.PoseRecovery(self.K, self.camera_offsets)
 
         self.pose_estimate_publisher = rospy.Publisher(
-            "/estimate/tcv/pose", perception.msg.EulerPose, queue_size=10
+            "/estimate/tcv/pose", EulerPose, queue_size=10
         )
 
         self.N_duration_entries = 1000
@@ -178,7 +178,7 @@ class TcvPoseEstimator():
                 self.processing_image = False
 
     def _publish_pose(self, pose):
-        msg = perception.msg.EulerPose()
+        msg = EulerPose()
         msg.header.stamp = rospy.Time.now()
 
         msg.x = pose[0]
