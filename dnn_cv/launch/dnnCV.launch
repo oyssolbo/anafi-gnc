@@ -11,11 +11,13 @@
         <param name="config_file" value="dnncv_config.yaml" />
     </node>
 
+    <node pkg="rosbag" type="play" name="player" output="screen" args="-s 0 /home/simenallum/2022-09-19-11-35-01.bag"/>
+
     <!-- DARKNET YOLO DETECTOR -->
 
     <!-- Console launch prefix -->
     <arg name="launch_prefix" default=""/>
-    <arg name="image" default="/camera/rgb/image_raw" />
+    <arg name="image" default="/anafi/image" />
 
     <!-- Config and weights folder. -->
     <arg name="yolo_weights_path"          default="$(find dnncv)/yolo_network_config/weights"/>
@@ -23,7 +25,7 @@
 
     <!-- ROS and network parameter files -->
     <arg name="ros_param_file"             default="$(find darknet_ros)/config/ros.yaml"/>
-    <arg name="network_param_file"         default="$(find dnncv)/config/yolov4-tiny-custom.yaml"/>
+    <arg name="network_param_file"         default="$(find dnncv)/config/anafi_real.yaml"/>
 
     <!-- Load parameters -->
     <rosparam command="load" ns="darknet_ros" file="$(arg ros_param_file)"/>
