@@ -1,10 +1,16 @@
 In order for this package to run we need to setup a couple of things. All of this is tested with NVIDIA geforce gtx 1050 ti
 
-1. Download the darknet_ros package from this link https://github.com/leggedrobotics/darknet_ros. Important to follow the installation guide in README.
+1. Recursivly clone this fork of the darknet_ros into ~/catkin_ws/src. This fork supports yolov4 and opencv4.
+    git clone --recursive https://github.com/Ar-Ray-code/darknet_ros_fp16/tree/noetic-fp16
 
-2. Download training weights using git lfs. git lfs install and then git lfs pull
+2. Swap branch and update submodules included:
+    cd darknet_ros_yolov4
+    git checkout remotes/origin/opencv4
+    git submodule update --recursive
 
-3. In order to utilize the GPU when running the network a few things have to be set.
+3. Download training weights using git lfs. git lfs install and then git lfs pull
+
+4. In order to utilize the GPU when running the network a few things have to be set.
     - in Terminal "nvcc --version" and check if ncvv is installed. This is dependent on g++ version you have installed. 
     With g++ 9 installed you would need nvcc version >= 11
 
@@ -18,10 +24,4 @@ In order for this package to run we need to setup a couple of things. All of thi
 
         Check now if "nvcc --version" is installed and shows version 11.7.
 
-4. Due to dep. in CUDA we need to remove a couple of supported architectures from the darknet_ros' CMakeLists.txt.
-    - comment out line 26 and 27 containing the following:
-
-        -gencode arch=compute_30,code=sm_30
-        -gencode arch=compute_35,code=sm_35
-
-5. catkin_make and source and hopefully be happy with the result :)
+6. catkin_make and source and hopefully be happy with the result :)
