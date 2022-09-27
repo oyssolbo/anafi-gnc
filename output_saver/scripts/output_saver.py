@@ -57,6 +57,14 @@ class OutputSaver():
             "estimates", "tcv_pose", self.environment
         )
 
+        estimates.AnafiOpticalFlowVelSaver(self.config, self.output_base_dir,
+            "estimates", "anafi_optical_flow", self.environment
+        )
+
+        estimates.AnafiPolledVelSaver(self.config, self.output_base_dir,
+            "estimates", "anafi_polled_vel", self.environment
+        )
+
         ground_truths.DronePoseDataSaver(self.config, self.output_base_dir,
             "ground_truths", "drone_pose_helipad_frame", self.environment
         )
