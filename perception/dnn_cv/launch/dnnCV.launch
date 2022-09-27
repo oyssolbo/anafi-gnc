@@ -11,7 +11,7 @@
         <param name="config_file" value="dnncv_config.yaml" />
     </node>
 
-    <node pkg="rosbag" type="play" name="player" output="screen" args="-s 12 /home/simenallum/2022-09-19-11-35-01.bag"/>
+    <!-- <node pkg="rosbag" type="play" name="player" output="screen" args="-s 12 /home/simenallum/2022-09-19-11-35-01.bag"/> -->
 
     <!-- DARKNET YOLO DETECTOR -->
 

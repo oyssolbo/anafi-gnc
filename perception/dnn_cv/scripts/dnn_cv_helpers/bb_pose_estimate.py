@@ -163,7 +163,7 @@ class BoundingBoxPoseEstimator():
         return center
 
     def _find_best_bb_of_class(self, bounding_boxes, classname):
-        matches =  list(item for item in bounding_boxes if item.Class == classname)
+        matches =  list(item for item in bounding_boxes if item.class_id == classname)
         try:
             best = max(matches, key=lambda x: x.probability)
         except ValueError as e:
