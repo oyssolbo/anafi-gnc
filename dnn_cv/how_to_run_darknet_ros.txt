@@ -1,11 +1,12 @@
 In order for this package to run we need to setup a couple of things. All of this is tested with NVIDIA geforce gtx 1050 ti
 
 1. Recursivly clone this fork of the darknet_ros into ~/catkin_ws/src. This fork supports yolov4 and opencv4.
-    git clone --recursive https://github.com/Ar-Ray-code/darknet_ros_fp16/tree/noetic-fp16
+    git clone --recursive https://github.com/Ar-Ray-code/darknet_ros_yolov4.git
 
 2. Swap branch and update submodules included:
     cd darknet_ros_yolov4
-    git checkout remotes/origin/opencv4
+    git branch -a
+    git checkout remotes/origin/noetic-fp16
     git submodule update --recursive
 
 3. Download training weights using git lfs. git lfs install and then git lfs pull
