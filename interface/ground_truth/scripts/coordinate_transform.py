@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation
 
 import rospy
 import geometry_msgs.msg
-import ground_truth.msg
+from anafi_uav_msgs.msg import PoseStampedEuler
 
 def Rx(degrees):
     radians = np.deg2rad(degrees)
@@ -46,7 +46,7 @@ class CoordinateTransform():
 
         script_dir = os.path.dirname(os.path.realpath(__file__))
 
-        config_file = rospy.get_param("~config")
+        config_file = rospy.get_param("~config_file")
         self.environment = rospy.get_param("~environment")
 
         try:
@@ -74,13 +74,13 @@ class CoordinateTransform():
         # Set up publisher for new drone pose relative to helipad in the helipad frame
         self.drone_pose_helipad_frame_publisher = rospy.Publisher(
             self.config["topics"]["drone_pose_helipad_frame"][self.environment],
-            ground_truth.msg.PoseStampedEuler, queue_size=1
+            PoseStampedEuler, queue_size=1
         )
 
         # Set up publisher for new drone pose realtive to the helipad in the body frame
         self.helipad_pose_body_frame_publisher = rospy.Publisher(
             self.config["topics"]["helipad_pose_body_frame"][self.environment],
-            ground_truth.msg.PoseStampedEuler, queue_size=1
+            PoseStampedEuler, queue_size=1
         )
 
 
@@ -235,7 +235,7 @@ class CoordinateTransform():
             rospy.logerr("Invalid frame ID, no such publisher available.")
             return
 
-        msg = ground_truth.msg.PoseStampedEuler()
+        msg = PoseStampedEuler()
         msg.header.stamp = rospy.Time.now()
         msg.header.frame_id = frame_id
         msg.x = pose[0]

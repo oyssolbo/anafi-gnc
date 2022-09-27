@@ -1,0 +1,17 @@
+<launch>
+    <rosparam command="load" file="$(find drone_interface)/config/anafi/params.yaml" />
+
+    <node
+        name="output_saver"
+        pkg="output_saver"
+        type="output_saver.py"
+        output="screen">
+        <param name="config_file" value="output_types.yaml" />
+        <param name="environment" value="real" />
+    </node>
+
+    <include file="$(find ground_truth)/launch/coordinate_transform_real.launch"></include>
+
+    <node pkg="rosbag" type="play" name="player" output="screen" args="-s 0 /home/simenallum/2022-09-19-11-35-01.bag"/>
+
+</launch>
