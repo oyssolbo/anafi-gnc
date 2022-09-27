@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>ground_truth</name>
+  <name>output_saver</name>
   <version>0.0.0</version>
-  <description>The ground_truth package</description>
+  <description>The output_saver package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -10,9 +10,6 @@
   <maintainer email="martin@todo.todo">martin</maintainer>
 
 
-  <!-- One license tag required, multiple allowed, one license per tag -->
-  <!-- Commonly used license strings: -->
-  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>license>TODO</license>
 
   <depend>std_srvs</depend>
@@ -30,7 +27,6 @@
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>anafi_uav_msgs</exec_depend>
-  <exec_depend>message_runtime</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

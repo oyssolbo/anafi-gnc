@@ -1,0 +1,10 @@
+<launch>
+    <node
+        name="output_saver"
+        pkg="output_saver"
+        type="output_saver.py"
+        output="screen">
+        <param name="config_file" value="output_types.yaml" />
+        <param name="environment" value="sim" />
+    </node>
+</launch>

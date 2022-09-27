@@ -35,6 +35,7 @@ add_message_files(
   PositionSetpointRelative.msg
   ReferenceStates.msg
   SaturationLimits.msg
+  PoseStampedEuler.msg
 )
 
 # Generate services in the 'srv' folder

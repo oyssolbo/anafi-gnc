@@ -32,7 +32,7 @@ def callback(msg: nav_msgs.msg.Odometry):
 
 rospy.init_node("quaternion_live_converter")
 
-topic_name = "/qualisys/anafi/odom"
+topic_name = "/qualisys/Anafi/odom"
 rospy.Subscriber(topic_name, nav_msgs.msg.Odometry, callback)
 
 rospy.spin()
