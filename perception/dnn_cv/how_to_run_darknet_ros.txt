@@ -1,0 +1,28 @@
+In order for this package to run we need to setup a couple of things. All of this is tested with NVIDIA geforce gtx 1050 ti
+
+1. Recursivly clone this fork of the darknet_ros into ~/catkin_ws/src. This fork supports yolov4 and opencv4.
+    git clone --recursive https://github.com/Ar-Ray-code/darknet_ros_yolov4.git
+
+2. Swap branch and update submodules included:
+    cd darknet_ros_yolov4
+    git branch -a
+    git checkout remotes/origin/noetic-fp16
+    git submodule update --recursive
+
+3. Download training weights using git lfs. git lfs install and then git lfs pull
+
+4. In order to utilize the GPU when running the network a few things have to be set.
+    - in Terminal "nvcc --version" and check if ncvv is installed. This is dependent on g++ version you have installed. 
+    With g++ 9 installed you would need nvcc version >= 11
+
+    - If not is installed, install the correct version from https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=20.04&target_type=runfile_local
+        Important here is to download the runfile-version of the toolkit. You may also need to download a supported driver with this one.
+        After the toolkit is installed, check the folder /usr/local/ if it containt the folder cuda-11.7
+        If it does add the following two lines to ~/.bashrc and source it:
+        
+            export PATH="/usr/local/cuda-11.7/bin:$PATH"
+            export LD_LIBRARY_PATH="/usr/local/cuda-11.7/lib64:$LD_LIBRARY_PATH"
+
+        Check now if "nvcc --version" is installed and shows version 11.7.
+
+6. catkin_make and source and hopefully be happy with the result :)

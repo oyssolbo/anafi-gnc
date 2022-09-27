@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<launch>
-    <include file="$(find perception)/launch/dnnCV_sim.launch"></include>
-    <include file="$(find perception)/launch/tcv_sim.launch"></include>
-    <include file="$(find perception)/launch/ekf_sim.launch"></include>
-    <include file="$(find perception)/launch/sim_all_sensing.launch"></include>
-</launch>
