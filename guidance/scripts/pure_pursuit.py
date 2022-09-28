@@ -8,7 +8,7 @@ from enum import Enum
 
 from geometry_msgs.msg import TwistStamped
 
-from anafi_uav_msgs.msg import EkfOutput, ReferenceStates
+from anafi_uav_msgs.msg import PointWithCovarianceStamped
 from anafi_uav_msgs.srv import SetDesiredPose, SetDesiredPoseRequest, SetDesiredPoseResponse
 
 import numpy as np
@@ -37,16 +37,16 @@ class PurePursuitGuidanceLaw():
     self.rate = rospy.Rate(controller_rate)
 
     # Set up subscribers 
-    rospy.Subscriber("/estimate/ekf", EkfOutput, self.__ekf_cb)
+    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self.__ekf_cb)
     rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self.__drone_gnss_cb)
     # rospy.Subscriber("/platform/out/gps", sensor_msgs.msg.NavSatFix, self.__target_gnss_cb) # Could be nice to subscribe to the estimated GNSS data about the target
     # rospy.Subscriber("/estimate/target_velocity", anafi_uav_msgs.msg.) # Would be nice to predict target movement
 
     # Set up publishers
-    self.reference_velocity_publisher = rospy.Publisher("/guidance/velocity_reference", TwistStamped, queue_size=1)
+    self.reference_velocity_publisher = rospy.Publisher("/guidance/pure_pursuit/velocity_reference", TwistStamped, queue_size=1)
 
     # Set up services
-    rospy.Service("/guidance/service/desired_pos", SetDesiredPose, self.__set_pos)
+    rospy.Service("/guidance/service/desired_pos", SetDesiredPose, self.__set_desired_ecef_pos)
 
     # Initialize parameters
     pure_pursuit_params = rospy.get_param("~pure_pursuit_parameters")
@@ -71,7 +71,7 @@ class PurePursuitGuidanceLaw():
     self.guidance_state : GuidanceState = GuidanceState.RELATIVE_TO_HELIPAD
 
 
-  def __set_pos(self, msg : SetDesiredPoseRequest) -> SetDesiredPoseResponse:
+  def __set_desired_ecef_pos(self, msg : SetDesiredPoseRequest) -> SetDesiredPoseResponse:
     self.desired_ecef_pos = np.array([msg.x_d, msg.y_d, msg.z_d]).T
 
     res = SetDesiredPoseResponse()
@@ -104,7 +104,7 @@ class PurePursuitGuidanceLaw():
     self.ecef_pos = np.array([x, y, z]).T
 
 
-  def __ekf_cb(self, msg : EkfOutput) -> None:
+  def __ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
@@ -112,7 +112,7 @@ class PurePursuitGuidanceLaw():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = np.array([msg.x, msg.y, msg.z]).T
+    self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1))
 
 
   def __clamp(
@@ -172,7 +172,7 @@ class PurePursuitGuidanceLaw():
 
       if pos_error_normed > 1e-3:
         kappa = (pos_error_normed * self.ua_max) / (np.sqrt(pos_error_normed + self.lookahead**2))
-        vel_ref_unclamped = vel_target - (kappa @ pos_error) / (pos_error_normed) 
+        vel_ref_unclamped = vel_target - (kappa * pos_error) / (pos_error_normed) 
       else:
         vel_ref_unclamped = zeros_3_1
 
