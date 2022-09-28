@@ -6,6 +6,7 @@ import numpy as np
 
 import anafi_uav_msgs.msg
 from anafi_uav_msgs.srv import SetPlannedActions, SetPlannedActionsRequest
+import std_msgs.msg
 
 import mission_planner_helpers.utilities as utilities
 
@@ -18,19 +19,19 @@ class MissionPlannerNode():
     self.rate = rospy.Rate(node_rate)
 
     # Setup subscribers
-    rospy.Subscriber("/drone/out/telemetry", anafi_uav_msgs.msg.AnafiTelemetry, self.__drone_telemetry_cb)
+    rospy.Subscriber("/anafi/state", std_msgs.msg.String, self.__drone_state_cb)
     rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self.__ekf_cb)
 
-    self.last_telemetry_msg : anafi_uav_msgs.msg.AnafiTelemetry = None 
+    self.new_drone_state_available : bool = False 
     self.pos : np.ndarray = None 
 
 
-  def __drone_telemetry_cb(
+  def __drone_state_cb(
         self, 
-        msg: anafi_uav_msgs.msg.AnafiTelemetry
+        msg: std_msgs.msg.String
       ) -> None:
-    self.last_telemetry_msg = msg
-    self.new_telemetry_available = True
+    self.drone_state = msg.data
+    self.new_drone_state_available = True
 
 
   def __ekf_cb(
