@@ -11,12 +11,12 @@ velocity_reference_model:
 
 pid:
   x_axis:
-    kp: -7
-    ki: -0.1
+    kp: 0.05 # -7 
+    ki: 0.1   # -0.1
     kd: 0
   y_axis:
-    kp: 7
-    ki: 0.1
+    kp: 0.05 # 7
+    ki: 0.1   # 0.1
     kd: 0
 
 linear_drag_model:
