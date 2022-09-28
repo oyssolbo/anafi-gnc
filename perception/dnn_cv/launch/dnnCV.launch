@@ -6,8 +6,7 @@
     <node
         name="dnn_cv"
         pkg="dnncv"
-        type="dnncv.py"
-        output="screen">
+        type="dnncv.py">
         <param name="config_file" value="dnncv_config.yaml" />
     </node>
 
