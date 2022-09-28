@@ -54,6 +54,24 @@ estimates:
     file_header: "Format: timestamp[sec] vx[m], vy[m], vz[m] phi[deg], theta[deg], psi[deg]\n"
     max_values_stored_in_buffer: 5
 
+  anafi_optical_flow:
+    name: anafi_optical_flow
+    num_states: 3
+    topic:
+      real: /anafi/optical_flow_speed
+      sim: /anafi/optical_flow_speed
+    file_header: "Format: timestamp[sec] vx[m], vy[m], vz[m]\n"
+    max_values_stored_in_buffer: 5
+
+  anafi_polled_vel:
+    name: anafi_polled_vel
+    num_states: 3
+    topic:
+      real: /anafi/twist_body
+      sim: /anafi/twist_body
+    file_header: "Format: timestamp[sec] vx[m], vy[m], vz[m]\n"
+    max_values_stored_in_buffer: 5
+
   dnn_cv_position:
     name: dnn_cv_position
     num_states: 3

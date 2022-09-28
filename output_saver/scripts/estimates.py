@@ -25,6 +25,40 @@ class AnafiRawDataSaver(GenericOutputSaver):
 
         self._save_output(output)
 
+class AnafiOpticalFlowVelSaver(GenericOutputSaver):
+    def __init__(self, config, base_dir, output_category, output_type, environment):
+        super().__init__(config, base_dir, output_category, output_type, environment)
+
+        rospy.Subscriber(self.topic_name, geometry_msgs.msg.Vector3Stamped, self._anafi_optical_flow_data_cb)
+
+    def _anafi_optical_flow_data_cb(self, msg: geometry_msgs.msg.Vector3Stamped):
+
+        output = [
+            msg.header.stamp.to_sec(),
+            msg.vector.x,
+            msg.vector.y,
+            msg.vector.z
+        ]
+
+        self._save_output(output)
+
+class AnafiPolledVelSaver(GenericOutputSaver):
+    def __init__(self, config, base_dir, output_category, output_type, environment):
+        super().__init__(config, base_dir, output_category, output_type, environment)
+
+        rospy.Subscriber(self.topic_name, geometry_msgs.msg.TwistStamped, self._anafi_polled_vel_data_cb)
+
+    def _anafi_polled_vel_data_cb(self, msg: geometry_msgs.msg.TwistStamped):
+
+        output = [
+            msg.header.stamp.to_sec(),
+            msg.twist.linear.x,
+            msg.twist.linear.y,
+            msg.twist.linear.z
+        ]
+
+        self._save_output(output)
+
 class DnnCvPositionSaver(GenericOutputSaver):
 
     def __init__(self, config, base_dir, output_category, output_type, environment):

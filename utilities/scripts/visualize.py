@@ -189,14 +189,15 @@ def main():
     plotter = Plotter()
 
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    data_dir = f"{script_dir}/../../../../../out/{args.data_dir}"
+    data_dir = f"{script_dir}/../../out/{args.data_dir}"
 
     # Load data
-    # gt_data = np.loadtxt(f"{data_dir}/ground_truths/helipad_pose_body_frame.txt", skiprows=2)
+    gt_data = np.loadtxt(f"{data_dir}/ground_truths/helipad_pose_body_frame.txt", skiprows=2)
+    dnncv_data = np.loadtxt(f"{data_dir}/estimates/dnn_cv_position.txt", skiprows=1)
     # gt_data_drone_pose = np.loadtxt(f"{data_dir}/ground_truths/drone_pose_helipad_frame.txt", skiprows=2)
-    anafi_raw_data = np.loadtxt(f"{data_dir}/estimates/anafi_raw_data.txt", skiprows=1)
+    # anafi_raw_data = np.loadtxt(f"{data_dir}/estimates/anafi_raw_data.txt", skiprows=1)
 
-    # # Calculate accuracy of DNNCV
+    # Calculate accuracy of DNNCV
     # ts, dnncv_pos, gt_pos = plotter.match_two_dataseries_one_to_one(dnncv_data, gt_data)
     # plotter.calculate_rmse_and_plot(
     #     ts,
@@ -357,30 +358,30 @@ def main():
     # # # GT, EKF, DNNCV and TCV all in one
     # # ###################
 
-    tcv_data = np.loadtxt(f"{data_dir}/estimates/tcv_pose.txt", skiprows=1)
-    dnncv_data = np.loadtxt(f"{data_dir}/estimates/dnn_cv_position.txt", skiprows=1)
-    ekf_data = np.loadtxt(f"{data_dir}/estimates/ekf_position.txt", skiprows=1)
-    gt_data = np.loadtxt(f"{data_dir}/ground_truths/helipad_pose_body_frame.txt", skiprows=2)
+    # tcv_data = np.loadtxt(f"{data_dir}/estimates/tcv_pose.txt", skiprows=1)
+    # dnncv_data = np.loadtxt(f"{data_dir}/estimates/dnn_cv_position.txt", skiprows=1)
+    # ekf_data = np.loadtxt(f"{data_dir}/estimates/ekf_position.txt", skiprows=1)
+    # gt_data = np.loadtxt(f"{data_dir}/ground_truths/helipad_pose_body_frame.txt", skiprows=2)
 
-    if args.data_dir == "2022-5-26/13-49-36":
-        title = "Perception output - Drone landing on discretely moving platform\nEnvironment: REAL - Guidance law: PID"
-        title = ""
-    elif args.data_dir == "2022-5-26/13-55-56":
-        title = "Perception output - Drone landing on continuously moving platform\nEnvironment: REAL - Guidance law: PID"
-        title = ""
-    elif args.data_dir == "2022-5-25/23-48-35":
-        title = r"Complete KF estimate vs. ground truth position $\bm p_h^b$" "\n" "Flight pattern: Square with yaw rotation at $\sim$60 sec"
-    else:
-        title = "Position - GT vs. EKF vs. DNNCV raw vs. TCV raw"
+    # if args.data_dir == "2022-5-26/13-49-36":
+    #     title = "Perception output - Drone landing on discretely moving platform\nEnvironment: REAL - Guidance law: PID"
+    #     title = ""
+    # elif args.data_dir == "2022-5-26/13-55-56":
+    #     title = "Perception output - Drone landing on continuously moving platform\nEnvironment: REAL - Guidance law: PID"
+    #     title = ""
+    # elif args.data_dir == "2022-5-25/23-48-35":
+    #     title = r"Complete KF estimate vs. ground truth position $\bm p_h^b$" "\n" "Flight pattern: Square with yaw rotation at $\sim$60 sec"
+    # else:
+    #     title = "Position - GT vs. EKF vs. DNNCV raw vs. TCV raw"
 
-    # # Compare DNNCV and EKF estimate to ground truth
-    synced_gt_dnncv_ekf_data = plotter.sync_multiple_data_series_based_on_timestamps([gt_data, ekf_data, dnncv_data, tcv_data])
-    legend = ["GT", "KF", "DNNCV", "TCV"]
-    plotter.plot_multiple_data_series(
-        synced_gt_dnncv_ekf_data, 3, title,
-        legend, ["t [sec]", "t [sec]", "t [sec]"], ["x[m]", "y[m]", "z[m]"],
-        [False, False, False, False], legend_size=8
-    )
+    # # # Compare DNNCV and EKF estimate to ground truth
+    # synced_gt_dnncv_ekf_data = plotter.sync_multiple_data_series_based_on_timestamps([gt_data, ekf_data, dnncv_data, tcv_data])
+    # legend = ["GT", "KF", "DNNCV", "TCV"]
+    # plotter.plot_multiple_data_series(
+    #     synced_gt_dnncv_ekf_data, 3, title,
+    #     legend, ["t [sec]", "t [sec]", "t [sec]"], ["x[m]", "y[m]", "z[m]"],
+    #     [False, False, False, False], legend_size=8
+    # )
 
     # ###################
     # # GT only
@@ -429,22 +430,36 @@ def main():
     # ###################
     # # 3D NED position
     # ###################
-    drone_pose_ned_gt = np.loadtxt(f"{data_dir}/ground_truths/drone_pose_ned.txt", skiprows=2)
-    helipad_pose_ned_gt = np.loadtxt(f"{data_dir}/ground_truths/helipad_pose.txt", skiprows=2)
+    # drone_pose_ned_gt = np.loadtxt(f"{data_dir}/ground_truths/drone_pose_ned.txt", skiprows=2)
+    # helipad_pose_ned_gt = np.loadtxt(f"{data_dir}/ground_truths/helipad_pose.txt", skiprows=2)
 
-    if args.data_dir == "2022-5-26/13-49-36":
-        title = "3D view - Drone landing on discretely moving platform\nEnvironment: REAL - Guidance law: PID"
-        title = ""
-        orientation = (12, -127)
-    elif args.data_dir == "2022-5-26/13-55-56":
-        title = "3D view - Drone landing on continuously moving platform\nEnvironment: REAL - Guidance law: PID"
-        title = ""
-        orientation = (11, -110)
-    else:
-        title = "Add title here"
-        orientation = None
+    # if args.data_dir == "2022-5-26/13-49-36":
+    #     title = "3D view - Drone landing on discretely moving platform\nEnvironment: REAL - Guidance law: PID"
+    #     title = ""
+    #     orientation = (12, -127)
+    # elif args.data_dir == "2022-5-26/13-55-56":
+    #     title = "3D view - Drone landing on continuously moving platform\nEnvironment: REAL - Guidance law: PID"
+    #     title = ""
+    #     orientation = (11, -110)
+    # else:
+    #     title = "Add title here"
+    #     orientation = None
 
-    plotter.plot_ned_positions_3d(drone_pose_ned_gt, helipad_pose_ned_gt, plot_title=title, orientation=orientation)
+    # plotter.plot_ned_positions_3d(drone_pose_ned_gt, helipad_pose_ned_gt, plot_title=title, orientation=orientation)
+
+    optical_flow_vel_data = np.loadtxt(f"{data_dir}/estimates/anafi_optical_flow.txt", skiprows=2)
+    polled_vel_data = np.loadtxt(f"{data_dir}/estimates/anafi_polled_vel.txt", skiprows=2)
+    qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
+
+
+    title = ""
+
+    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([optical_flow_vel_data, polled_vel_data, qualisys_drone_vel])
+    plotter.plot_multiple_data_series(
+        synced_vel_data, 3, title,
+        ["Optical flow", "Polled", "GT"], ["t [sec]", "t [sec]", "t [sec]"], ["vx[m]", "vy[m]", "vz[m]"],
+        [False, False, False]
+    )
 
     plt.show()
 
