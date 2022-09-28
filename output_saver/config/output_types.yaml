@@ -59,6 +59,7 @@ estimates:
     num_states: 3
     topic:
       real: /anafi/optical_flow_speed
+      sim: /anafi/optical_flow_speed
     file_header: "Format: timestamp[sec] vx[m], vy[m], vz[m]\n"
     max_values_stored_in_buffer: 5
 
@@ -67,6 +68,7 @@ estimates:
     num_states: 3
     topic:
       real: /anafi/twist_body
+      sim: /anafi/twist_body
     file_header: "Format: timestamp[sec] vx[m], vy[m], vz[m]\n"
     max_values_stored_in_buffer: 5
 
