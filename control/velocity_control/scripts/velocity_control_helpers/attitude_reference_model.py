@@ -58,7 +58,7 @@ class PIDReferenceGenerator(GenericAttitudeReferenceGenerator):
       debug : bool        = False
     ) -> np.ndarray:
 
-    error = v_ref[:2] - v
+    error = v_ref[:2] - v[:2]
 
     e_x = error[0]
     e_y = error[1]
@@ -86,15 +86,17 @@ class PIDReferenceGenerator(GenericAttitudeReferenceGenerator):
     pitch_reference = self._Kp_x*e_x + self._Kd_x*e_dot_x + self._Ki_x*self._error_int[0]
     roll_reference = self._Kp_y*e_y + self._Kd_y*e_dot_y + self._Ki_y*self._error_int[1]
 
-    pitch_reference = self.clamp(pitch_reference, self._pitch_limits)
-    roll_reference = self.clamp(roll_reference, self._roll_limits)
+    pitch_reference = self.clamp(pitch_reference[0], self._pitch_limits)
+    roll_reference = self.clamp(roll_reference[0], self._roll_limits)
 
-    attitude_reference = np.array([roll_reference, pitch_reference])
+    attitude_reference = np.array([roll_reference, pitch_reference], dtype=float)
 
     if debug:
       print(f"Timestamp: {ts}")
-      print(f"Pitch gains:\tP: {self._Kp_x*e_x:.3f}\tI: {self._Ki_x*self._error_int[0]:.3f}\tD: {self._Kd_x*e_dot_x:.3f} ")
-      print(f"Roll gains:\tP: {self._Kp_y*e_y:.3f}\tI: {self._Ki_y*self._error_int[1]:.3f}\tD: {self._Kd_y*e_dot_y:.3f} ")
+      # print(f"Pitch gains:\tP: {self._Kp_x*e_x:.3f}\tI: {self._Ki_x*self._error_int[0]:.3f}\tD: {self._Kd_x*e_dot_x:.3f} ")
+      # print(f"Roll gains:\tP: {self._Kp_y*e_y:.3f}\tI: {self._Ki_y*self._error_int[1]:.3f}\tD: {self._Kd_y*e_dot_y:.3f} ")
+      print(pitch_reference)
+      print(roll_reference)
       print()
 
     return attitude_reference

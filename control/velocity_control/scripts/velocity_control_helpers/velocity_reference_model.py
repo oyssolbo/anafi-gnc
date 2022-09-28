@@ -37,7 +37,7 @@ class VelocityReferenceModel():
         v_ref_raw : np.ndarray, 
         dt        : float
       ) -> np.ndarray:
-    r = v_ref_raw
+    r = v_ref_raw.reshape((2, 1)) # Fuck python for being fuckings useless
 
     xd_dot = self._Ad @ xd_prev + self._Bd @ r
     xd_next = xd_prev + dt * xd_dot
