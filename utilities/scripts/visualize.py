@@ -449,15 +449,16 @@ def main():
 
     optical_flow_vel_data = np.loadtxt(f"{data_dir}/estimates/anafi_optical_flow.txt", skiprows=2)
     polled_vel_data = np.loadtxt(f"{data_dir}/estimates/anafi_polled_vel.txt", skiprows=2)
+    qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
 
 
     title = ""
 
-    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([optical_flow_vel_data, polled_vel_data])
+    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([optical_flow_vel_data, polled_vel_data, qualisys_drone_vel])
     plotter.plot_multiple_data_series(
         synced_vel_data, 3, title,
-        ["Optical flow", "Polled", "TCV"], ["t [sec]", "t [sec]", "t [sec]"], ["vx[m]", "vy[m]", "vz[m]"],
-        [False, False, True]
+        ["Optical flow", "Polled", "GT"], ["t [sec]", "t [sec]", "t [sec]"], ["vx[m]", "vy[m]", "vz[m]"],
+        [False, False, False]
     )
 
     plt.show()
