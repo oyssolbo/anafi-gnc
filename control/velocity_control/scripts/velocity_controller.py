@@ -31,7 +31,7 @@ class VelocityController():
     # Initializing reference models
     pid_controller_parameters = rospy.get_param("~pid")
     attitude_limits = rospy.get_param("~attitude_limits")
-    self.attitude_reference_model = attitude_reference_model.PIDReferenceGenerator(
+    self.attitude_reference_model = attitude_reference_model.iPIDReferenceGenerator( #PIDReferenceGenerator(...)
       params=pid_controller_parameters,
       limits=attitude_limits
     )
@@ -39,9 +39,13 @@ class VelocityController():
     velocity_reference_model_parameters = rospy.get_param("~velocity_reference_model")
     velocity_reference_omegas = velocity_reference_model_parameters["omegas"]
     velocity_reference_zetas = velocity_reference_model_parameters["zetas"]
+    velocity_reference_T_z = velocity_reference_model_parameters["T_z"]
+    velocity_reference_K_z = velocity_reference_model_parameters["K_z"]
     self.velocity_reference_model = velocity_reference_model.VelocityReferenceModel(
       omegas=velocity_reference_omegas,
-      zetas=velocity_reference_zetas
+      zetas=velocity_reference_zetas,
+      T_z=velocity_reference_T_z,
+      K_z=velocity_reference_K_z
     )
 
     # Setup services
@@ -58,7 +62,7 @@ class VelocityController():
     self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
     self.velocities_body : np.ndarray = np.zeros((3, 1))
 
-    self.volicities_body_timestamp : std_msgs.msg.Time = None
+    self.velocities_body_timestamp : std_msgs.msg.Time = None
     self.guidance_timestamp : std_msgs.msg.Time = None
 
     self.is_controller_active : bool = False
@@ -87,34 +91,34 @@ class VelocityController():
   def __twist_cb(self, msg : TwistStamped) -> None:
     msg_timestamp = msg.header.stamp
 
-    if not utilities.is_new_msg_timestamp(self.volicities_body_timestamp, msg_timestamp):
+    if not utilities.is_new_msg_timestamp(self.velocities_body_timestamp, msg_timestamp):
       # Old message
       return
     
-    self.volicities_body_timestamp = msg_timestamp
+    self.velocities_body_timestamp = msg_timestamp
     self.velocities_body = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
 
 
   def publish_attitude_ref(self) -> None:
     attitude_cmd_msg = AttitudeCommand()
 
-    x_d = np.zeros((4, 1))
+    x_d = np.zeros((5, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
         x_d = self.velocity_reference_model.get_filtered_reference(
           xd_prev=x_d, 
-          v_ref_raw=self.guidance_reference_velocities[:2],
+          v_ref_raw=self.guidance_reference_velocities,
           dt=self.dt
         )
         
         att_ref = self.attitude_reference_model.get_attitude_reference(
           v_ref=(x_d[:2]).reshape((2, 1)),
           v=(self.velocities_body[:2]).reshape((2, 1)), 
-          ts=self.volicities_body_timestamp,
+          ts=self.velocities_body_timestamp,
           debug=False
         )
 
-        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, -self.guidance_reference_velocities[2]], dtype=np.float64).T 
+        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, x_d[4]], dtype=np.float64) 
         attitude_cmd_msg.header.stamp = rospy.Time.now()
         attitude_cmd_msg.roll = att_ref_3D[0]   
         attitude_cmd_msg.pitch = att_ref_3D[1]
@@ -125,7 +129,7 @@ class VelocityController():
 
       else:
         self.guidance_reference_velocities = np.zeros((3, 1))
-        x_d = np.zeros((4, 1))
+        x_d = np.zeros((5, 1))
       
       self.rate.sleep()
 

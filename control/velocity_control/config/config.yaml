@@ -2,12 +2,16 @@ node_name: "attitude_controller_node"
 node_rate: 20
 
 attitude_limits:
-  pitch: [-5, 5]
-  roll: [-5, 5]
+  pitch: [-5, 5]  # deg
+  roll: [-5, 5]   # deg
 
 velocity_reference_model:
   omegas: [10, 10]
   zetas: [1, 1]
+
+  # First order reference model for vertical velocity
+  T_z: 0.5
+  K_z: 1
 
 pid:
   x_axis:
