@@ -292,8 +292,7 @@ class MissionExecutorNode():
         timeout=service_timeout 
       )(True)
       if not service_response.success:
-        rospy.logerr("[__track()] Cannot enable velocity-controller")
-        raise ValueError()
+        raise ValueError("[__track()] Cannot enable velocity-controller")
 
     except Exception as e:
       rospy.logerr("[__track()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
@@ -445,11 +444,27 @@ class MissionExecutorNode():
     if self.action_str == "track":
       # Check that the error is small enough
       if self.pos_relative_to_helipad is None:
-        # Simulator without input from the EKF - TODO: check how this will change in reality
+        # No input from the EKF received
         return (True, False, 0)
-      pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad)
-      max_pos_tracking_error_normed = rospy.get_param("~max_pos_tracking_error_normed", default=0.25)
-      return (pos_error_normed < max_pos_tracking_error_normed, False, 0) 
+      # TODO: Add a position above the landing pad to achieve before landing
+      horizontal_pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad[:2])
+      vertical_pos_error = self.pos_relative_to_helipad[2]
+      
+      horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.1)
+      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.5)
+
+      is_drone_close_to_helipad = (
+        (horizontal_pos_error_normed < horizontal_tracking_error_limit) 
+        and 
+        (np.abs(vertical_pos_error) < vertical_tracking_error_limit) 
+      )
+
+      # Obs! This should be kept over some time, such that it will not try to land 
+      # if it receives a single faulty-measurement
+      if is_drone_close_to_helipad:
+        current_count += 1
+
+      return (is_drone_close_to_helipad and current_count >= 3, False, current_count) 
 
 
     # The different actions are set as True, since these are not implemented
@@ -571,12 +586,24 @@ class MissionExecutorNode():
         action_finished_counts = 0
 
       elif has_action_execution_exceeded_limit or self.is_ordered_to_cancel_current_action:
-
+        
+        # TODO: Move this into own function(s)
         rospy.loginfo("{}. Has exceeded expected time limit: {} [s]".format(self.action_str, self.max_expected_action_time_s))
+        
         if self.action_str == "takeoff":
           # Retry takeoff
           rospy.loginfo("Retrying takeoff")
           self.__takeoff()
+        
+        if self.action_str == "land" and self.__check_current_action_finished(start_time, action_finished_counts)[0]:
+          # Retry landing
+          rospy.loginfo("Retrying landing")
+          self.__land()  
+        elif self.drone_state in ["FS_FLYING", "FS_HOVERING"]:
+          # Try to track helipad
+          self.action_str = "track"
+          self.__track()
+
         if self.action_str == "move_relative" and self.drone_state == "FS_FLYING":
           # Might be stuck in the state "FS_FLYING" if only controlling the altitude (on the sim, atleast)
           rospy.loginfo("Trying to hover")
