@@ -150,7 +150,11 @@ class PurePursuitGuidanceLaw():
       if (self.ekf_timestamp is None):
         return np.zeros((3, 1))
 
-      return self.pos_relative_to_helipad    
+      # Using a target-position above the helipad to guide safely
+      target_position = np.array([0, 0, 0.25])
+      error = self.pos_relative_to_helipad - target_position
+      return -error
+
 
     return zeros
 
@@ -167,7 +171,7 @@ class PurePursuitGuidanceLaw():
 
     while not rospy.is_shutdown():
 
-      pos_error = self.__get_valid_pos_error()
+      pos_error = self.__get_valid_pos_error() # Obs -
       pos_error_normed = np.linalg.norm(pos_error)
 
       if pos_error_normed > 1e-3:

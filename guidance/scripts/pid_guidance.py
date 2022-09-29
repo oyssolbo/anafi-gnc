@@ -97,15 +97,19 @@ class PIDGuidanceLaw():
     self.ekf_timestamp = msg_timestamp
     self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z]).T
 
+  def __get_position_error(self) -> np.ndarray:
+    if (self.ekf_timestamp is None):
+      return np.zeros((3, 1))
+
+    # Using a target-position above the helipad to guide safely
+    target_position = np.array([0, 0, 0.25])
+    error = self.pos_relative_to_helipad - target_position
+    return -error
+
 
   def get_velocity_reference(self, pos_error_body: np.ndarray, ts: float, debug=False) -> np.ndarray:
 
-    if pos_error_body.shape[0] == 2:
-      control3D = False
-    elif pos_error_body.shape[0] == 3:
-      control3D = True
-    else:
-      print(f"Position error has wrong shape, should be 2 or 3, is: {pos_error_body.shape[0]}")
+    control3D = (pos_error_body.shape[0] == 3)
 
     e_x = pos_error_body[0]
     e_y = pos_error_body[1]
@@ -168,12 +172,6 @@ class PIDGuidanceLaw():
       print()
 
     return velocity_reference
-
-  def __get_position_error(self) -> np.ndarray:
-    if (self.ekf_timestamp is None):
-      return np.zeros((3, 1))
-
-    return self.pos_relative_to_helipad    
 
 
   def run(self) -> None:
