@@ -60,6 +60,8 @@ class PurePursuitGuidanceLaw():
     self.vy_limits = velocity_limits["vy"]
     self.vz_limits = velocity_limits["vz"]
 
+    self.desired_altitude : float = 1.0
+
     self.ekf_timestamp : std_msgs.msg.Time = None
     self.gnss_timestamp : std_msgs.msg.Time = None
 
@@ -151,10 +153,10 @@ class PurePursuitGuidanceLaw():
         return np.zeros((3, 1))
 
       # Using a target-position above the helipad to guide safely
-      target_position = np.array([0, 0, 0.25])
-      error = self.pos_relative_to_helipad - target_position
-      return -error
-
+      # target_position = np.array([0, 0, 0.25]).reshape((3, 1))
+      error = -self.pos_relative_to_helipad #- target_position
+      error[2] = -error[2] #- self.desired_altitude
+      return error
 
     return zeros
 
@@ -170,9 +172,17 @@ class PurePursuitGuidanceLaw():
     vel_target = zeros_3_1 # Possible extension to use constant bearing guidance in the future
 
     while not rospy.is_shutdown():
+      if self.pos_relative_to_helipad is None:
+        self.rate.sleep()
+        continue
 
-      pos_error = self.__get_valid_pos_error() # Obs -
+      pos_error = self.__get_valid_pos_error()
       pos_error_normed = np.linalg.norm(pos_error)
+      horizontal_error_normed = np.linalg.norm(pos_error[:2])
+
+      # Control vertical position error when low horizontal error
+      if horizontal_error_normed > 0.5:
+        self.desired_altitude = -1.0
 
       if pos_error_normed > 1e-3:
         kappa = (pos_error_normed * self.ua_max) / (np.sqrt(pos_error_normed + self.lookahead**2))
@@ -180,10 +190,16 @@ class PurePursuitGuidanceLaw():
       else:
         vel_ref_unclamped = zeros_3_1
 
+      print(pos_error)
+      print()
+      print(vel_ref_unclamped)
+      print("\n\n")
+
       vel_ref_x = self.__clamp(vel_ref_unclamped[0], self.vx_limits)
       vel_ref_y = self.__clamp(vel_ref_unclamped[1], self.vy_limits)
       vel_ref_z = self.__clamp(vel_ref_unclamped[2], self.vz_limits)
 
+      twist_ref_msg.header.stamp = rospy.Time.now()
       twist_ref_msg.twist.linear.x = vel_ref_x
       twist_ref_msg.twist.linear.y = vel_ref_y
       twist_ref_msg.twist.linear.z = vel_ref_z
