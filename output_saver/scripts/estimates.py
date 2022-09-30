@@ -37,9 +37,9 @@ class AnafiOpticalFlowVelSaver(GenericOutputSaver):
             msg.header.stamp.to_sec(),
             # Swapped places between x and y, since the optixal-flow has a different coordinate-axis,
             # with y on vertical and x on horizontal
-            msg.vector.y,
-            msg.vector.x,
-            msg.vector.z
+            -msg.vector.y,
+            -msg.vector.x,
+            -msg.vector.z
         ]
 
         self._save_output(output)

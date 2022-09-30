@@ -10,6 +10,7 @@ import rospy
 
 import ground_truths
 import estimates
+import commands
 
 class OutputSaver():
 
@@ -95,6 +96,10 @@ class OutputSaver():
 
         ground_truths.DronePoseNEDDataSaver(self.config, self.output_base_dir,
             "ground_truths", "drone_pose_ned", self.environment
+        )
+
+        commands.AnafiAttitudeCMDSaver(self.config, self.output_base_dir,
+            "commands", "attitude_cmd", self.environment
         )
 
         rospy.on_shutdown(self._on_shutdown)

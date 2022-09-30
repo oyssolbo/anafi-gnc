@@ -127,3 +127,13 @@ estimates:
     file_header: "Format: timestamp[sec] [x[m], y[m], z[m],
                   covariance for each state (flattened 3x3 matrix)]\n"
     max_values_stored_in_buffer: 10
+
+commands:
+  attitude_cmd:
+    name: attitude_cmd
+    num_states: 4
+    topic:
+      sim: /anafi/cmd_rpyt
+      real: /anafi/cmd_rpyt
+    file_header: "Format: timestamp[sec] roll[deg], pitch[deg], yaw[deg], thrust[m/s]\n"
+    max_values_stored_in_buffer: 1
