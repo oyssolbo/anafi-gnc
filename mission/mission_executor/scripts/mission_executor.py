@@ -445,19 +445,23 @@ class MissionExecutorNode():
       # Check that the error is small enough
       if self.pos_relative_to_helipad is None:
         # No input from the EKF received
+        rospy.loginfo("EKF does not appear to be running. Exiting tracking-action")
         return (True, False, 0)
       # TODO: Add a position above the landing pad to achieve before landing
       horizontal_pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad[:2])
       vertical_pos_error = self.pos_relative_to_helipad[2]
       
       horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.1)
-      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.5)
+      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.2)
 
       is_drone_close_to_helipad = (
         (horizontal_pos_error_normed < horizontal_tracking_error_limit) 
         and 
         (np.abs(vertical_pos_error) < vertical_tracking_error_limit) 
       )
+      print(horizontal_pos_error_normed)
+      print(vertical_pos_error)
+      print()
 
       # Obs! This should be kept over some time, such that it will not try to land 
       # if it receives a single faulty-measurement
