@@ -31,9 +31,9 @@ class VelocityController():
     # Initializing reference models
     pid_controller_parameters = rospy.get_param("~pid")
     attitude_limits = rospy.get_param("~attitude_limits")
-    self.attitude_reference_model = attitude_reference_model.iPIDReferenceGenerator( #PIDReferenceGenerator(...)
+    self.attitude_reference_model = attitude_reference_model.PIDReferenceGenerator( #PIDReferenceGenerator(...)
       params=pid_controller_parameters,
-      limits=attitude_limits
+      limits=attitude_limits 
     )
 
     velocity_reference_model_parameters = rospy.get_param("~velocity_reference_model")
@@ -53,7 +53,8 @@ class VelocityController():
 
     # Setup subscribers 
     rospy.Subscriber("/anafi/twist_body", TwistStamped, self.__twist_cb)
-    rospy.Subscriber("/guidance/pure_pursuit/velocity_reference", TwistStamped, self.__reference_velocities_cb)
+    rospy.Subscriber("/guidance/pid/velocity_reference", TwistStamped, self.__reference_velocities_cb)
+    # rospy.Subscriber("/guidance/pure_pursuit/velocity_reference", TwistStamped, self.__reference_velocities_cb)
 
     # Setup publishers
     self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
@@ -118,7 +119,7 @@ class VelocityController():
           debug=False
         )
 
-        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, x_d[4]], dtype=np.float64) 
+        att_ref_3D = np.array([-att_ref[0], -att_ref[1], 0, x_d[4]], dtype=np.float64) 
         attitude_cmd_msg.header.stamp = rospy.Time.now()
         attitude_cmd_msg.roll = att_ref_3D[0]   
         attitude_cmd_msg.pitch = att_ref_3D[1]
