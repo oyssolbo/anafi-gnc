@@ -90,7 +90,6 @@ estimates:
     file_header: "Format: timestamp[sec] linear, angular\n"
     max_values_stored_in_buffer: 6
 
-
   dnn_cv_position:
     name: dnn_cv_position
     num_states: 3

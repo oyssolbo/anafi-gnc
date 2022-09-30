@@ -61,7 +61,6 @@ class AnafiPolledVelSaver(GenericOutputSaver):
 
         self._save_output(output)
 
-
 class GuidanceSaver(GenericOutputSaver):
     def __init__(self, config, base_dir, output_category, output_type, environment):
         super().__init__(config, base_dir, output_category, output_type, environment)
