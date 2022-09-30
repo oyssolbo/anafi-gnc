@@ -1,0 +1,8 @@
+<launch>
+    <node
+        name="pid_guidance"
+        pkg="guidance"
+        type="pid_guidance.py"
+        output="screen">
+    </node>
+</launch>

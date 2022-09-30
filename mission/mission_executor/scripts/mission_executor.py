@@ -42,7 +42,7 @@ class MissionExecutorNode():
     # rospy.Subscriber("/drone/out/telemetry", anafi_uav_msgs.msg.AnafiTelemetry, self.__drone_telemetry_cb)
     rospy.Subscriber("/anafi/state", std_msgs.msg.String, self.__drone_state_cb) 
     rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self.__drone_gnss_cb)
-    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.EkfOutput, self.__ekf_cb)
+    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self.__ekf_cb)
 
     # Setup services
     rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self.__set_planned_actions_srv)
@@ -71,6 +71,9 @@ class MissionExecutorNode():
     self.drone_state_update_timestamp : bool = False
 
     self.is_ordered_to_cancel_current_action : bool = False
+
+    self.gnss_timestamp : rospy.Time = None
+    self.ekf_timestamp : rospy.Time = None
 
     testing_config = rospy.get_param("~testing")
     if testing_config["is_mission_testing"]:
@@ -106,9 +109,9 @@ class MissionExecutorNode():
       ) -> None:
     msg_timestamp = msg.header.stamp
 
-    # if not utilities.is_new_msg_timestamp(self.gnss_timestamp, msg_timestamp):
-    #   # Old message
-    #   return
+    if not utilities.is_new_msg_timestamp(self.gnss_timestamp, msg_timestamp):
+      # Old message
+      return
 
     gnss_status = msg.status
     if gnss_status == -1:
@@ -120,18 +123,17 @@ class MissionExecutorNode():
     altitude_m = msg.altitude 
 
     # Convertion from long / lat / altitude to ECEF
-
     ecef = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
     lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
     x, y, z = pyproj.transform(lla, ecef, longitude_deg, latitude_deg, altitude_m, radians=False)
     
-    # self.gnss_timestamp = msg_timestamp
+    self.gnss_timestamp = msg_timestamp
     self.pos_ecef = np.array([x, y, z]).T
 
 
   def __ekf_cb(
         self, 
-        msg : anafi_uav_msgs.msg.EkfOutput
+        msg : anafi_uav_msgs.msg.PointWithCovarianceStamped
       ) -> None:
     msg_timestamp = msg.header.stamp
 
@@ -140,7 +142,7 @@ class MissionExecutorNode():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = np.array([msg.x, msg.y, msg.z]).T
+    self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z]).T # Is this really correct to say that this is the position relative to the helipad?
 
 
   def __set_planned_actions_srv(
@@ -258,7 +260,7 @@ class MissionExecutorNode():
     rospy.loginfo("Trying to land")
 
     try:
-      service_timeout = 0.5 # Short timeout on landing due to strict schedules
+      service_timeout = 0.5 # Short timeout might be problem due to power drain on sim... 
       
       # Disable the velocity controller
       service_response = self.__get_service_interface(
@@ -271,7 +273,6 @@ class MissionExecutorNode():
         raise ValueError()
 
       # Land
-      # for i in range(50):
       self.land_pub.publish(std_msgs.msg.Empty())
 
     except Exception as e:
@@ -291,14 +292,7 @@ class MissionExecutorNode():
         timeout=service_timeout 
       )(True)
       if not service_response.success:
-        rospy.logerr("[__track()] Cannot enable velocity-controller")
-        raise ValueError()
-
-      # The reference controller is activated
-      # Use a guidance law to eliminate the errors in position
-      # Could set the desired position in guidance
-      # The guidance law should by default use the relative distance to the 
-      # platform, unless it has been rewritten after writing this (17.09.22)
+        raise ValueError("[__track()] Cannot enable velocity-controller")
 
     except Exception as e:
       rospy.logerr("[__track()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
@@ -450,11 +444,31 @@ class MissionExecutorNode():
     if self.action_str == "track":
       # Check that the error is small enough
       if self.pos_relative_to_helipad is None:
-        # Simulator without input from the EKF - TODO: check how this will change in reality
+        # No input from the EKF received
+        rospy.loginfo("EKF does not appear to be running. Exiting tracking-action")
         return (True, False, 0)
-      pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad)
-      max_pos_tracking_error_normed = rospy.get_param("~max_pos_tracking_error_normed", default=0.25)
-      return (pos_error_normed < max_pos_tracking_error_normed, False, 0) 
+      # TODO: Add a position above the landing pad to achieve before landing
+      horizontal_pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad[:2])
+      vertical_pos_error = self.pos_relative_to_helipad[2]
+      
+      horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.1)
+      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.2)
+
+      is_drone_close_to_helipad = (
+        (horizontal_pos_error_normed < horizontal_tracking_error_limit) 
+        and 
+        (np.abs(vertical_pos_error) < vertical_tracking_error_limit) 
+      )
+      print(horizontal_pos_error_normed)
+      print(vertical_pos_error)
+      print()
+
+      # Obs! This should be kept over some time, such that it will not try to land 
+      # if it receives a single faulty-measurement
+      if is_drone_close_to_helipad:
+        current_count += 1
+
+      return (is_drone_close_to_helipad and current_count >= 3, False, current_count) 
 
 
     # The different actions are set as True, since these are not implemented
@@ -576,12 +590,24 @@ class MissionExecutorNode():
         action_finished_counts = 0
 
       elif has_action_execution_exceeded_limit or self.is_ordered_to_cancel_current_action:
-
+        
+        # TODO: Move this into own function(s)
         rospy.loginfo("{}. Has exceeded expected time limit: {} [s]".format(self.action_str, self.max_expected_action_time_s))
+        
         if self.action_str == "takeoff":
           # Retry takeoff
           rospy.loginfo("Retrying takeoff")
           self.__takeoff()
+        
+        if self.action_str == "land" and self.__check_current_action_finished(start_time, action_finished_counts)[0]:
+          # Retry landing
+          rospy.loginfo("Retrying landing")
+          self.__land()  
+        elif self.drone_state in ["FS_FLYING", "FS_HOVERING"]:
+          # Try to track helipad
+          self.action_str = "track"
+          self.__track()
+
         if self.action_str == "move_relative" and self.drone_state == "FS_FLYING":
           # Might be stuck in the state "FS_FLYING" if only controlling the altitude (on the sim, atleast)
           rospy.loginfo("Trying to hover")

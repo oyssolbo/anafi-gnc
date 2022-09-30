@@ -7,8 +7,8 @@ velocity_limits:
   vz: [-0.1, 0.1]
 
 pure_pursuit_parameters:
-  ua_max: 10      # Look this up later
-  lookahead: 0.25 # Smaller lookahead gives more aggressive guidance
+  ua_max: 1.0     # Look this up later
+  lookahead: 2.0  # Smaller lookahead gives more aggressive guidance
   kappa: 0.2      # Might be too small for our use case
 
 max_error_normed: 10  # [m] Outside of this error, the pure pursuit guidance

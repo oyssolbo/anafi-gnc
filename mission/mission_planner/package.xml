@@ -9,6 +9,7 @@
   <license>TODO</license>
 
   <depend>anafi_uav_msgs</depend>
+  <depend>std_msgs</depend>
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roscpp</build_depend>

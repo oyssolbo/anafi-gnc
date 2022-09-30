@@ -192,8 +192,8 @@ def main():
     data_dir = f"{script_dir}/../../out/{args.data_dir}"
 
     # Load data
-    gt_data = np.loadtxt(f"{data_dir}/ground_truths/helipad_pose_body_frame.txt", skiprows=2)
-    dnncv_data = np.loadtxt(f"{data_dir}/estimates/dnn_cv_position.txt", skiprows=1)
+    # gt_data = np.loadtxt(f"{data_dir}/ground_truths/helipad_pose_body_frame.txt", skiprows=2)
+    # dnncv_data = np.loadtxt(f"{data_dir}/estimates/dnn_cv_position.txt", skiprows=1)
     # gt_data_drone_pose = np.loadtxt(f"{data_dir}/ground_truths/drone_pose_helipad_frame.txt", skiprows=2)
     # anafi_raw_data = np.loadtxt(f"{data_dir}/estimates/anafi_raw_data.txt", skiprows=1)
 
@@ -447,21 +447,51 @@ def main():
 
     # plotter.plot_ned_positions_3d(drone_pose_ned_gt, helipad_pose_ned_gt, plot_title=title, orientation=orientation)
 
-    optical_flow_vel_data = np.loadtxt(f"{data_dir}/estimates/anafi_optical_flow.txt", skiprows=2)
-    polled_vel_data = np.loadtxt(f"{data_dir}/estimates/anafi_polled_vel.txt", skiprows=2)
-    qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
+    # optical_flow_vel_data = np.loadtxt(f"{data_dir}/estimates/anafi_optical_flow.txt", skiprows=2)
+    # polled_vel_data = np.loadtxt(f"{data_dir}/estimates/anafi_polled_vel.txt", skiprows=2)
+    # # qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
 
 
-    title = ""
+    # # title = "Polled velocity vs optical flow"
 
-    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([optical_flow_vel_data, polled_vel_data, qualisys_drone_vel])
+    # synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([optical_flow_vel_data, polled_vel_data])#, qualisys_drone_vel])
+    # plotter.plot_multiple_data_series(
+    #     synced_vel_data, 2, title,
+    #     ["Optical flow", "Polled"], ["t [sec]", "t [sec]"], ["vx[m]", "vy[m]", "vz[m]"],
+    #     [False, False]
+    # )
+
+    # # # print(f"{data_dir}/estimates/guidance_pure_pursuit.txt")
+    pure_pursuit = np.loadtxt(f"{data_dir}/estimates/guidance_pure_pursuit.txt", skiprows=2)
+    pid_guidance = np.loadtxt(f"{data_dir}/estimates/guidance_pid.txt", skiprows=2)
+    optical_flow = np.loadtxt(f"{data_dir}/estimates/anafi_optical_flow.txt", skiprows=2)
+    polled_vel = np.loadtxt(f"{data_dir}/estimates/anafi_polled_vel.txt", skiprows=2)
+
+    # qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
+
+    title = "Guidance vs actual"
+    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([pure_pursuit, pid_guidance, optical_flow, polled_vel])#, qualisys_drone_vel])
     plotter.plot_multiple_data_series(
-        synced_vel_data, 3, title,
-        ["Optical flow", "Polled", "GT"], ["t [sec]", "t [sec]", "t [sec]"], ["vx[m]", "vy[m]", "vz[m]"],
-        [False, False, False]
+        data=synced_vel_data, numplots=3, suptitle=title,
+        legends=["Pure pursuit", "PID", "Optical flow", "Polled velocity"], xlabels=["t [sec]", "t [sec]", "t [sec]"], ylabels=["vx[m]", "vy[m]", "vz[m]"],
+        use_scatter=[False, False, False, False]
     )
 
     plt.show()
+
+    # attitude_commands = np.loadtxt(f"{data_dir}/commands/attitude_cmd.txt", skiprows=2)
+    # # qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
+
+    # title = "Attitude commands"
+    # synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([attitude_commands])#, qualisys_drone_vel])
+    # plotter.plot_multiple_data_series(
+    #     data=synced_vel_data, numplots=4, suptitle=title,
+    #     legends=["Attitude commands"], xlabels=["t [sec]"]*4, ylabels=["roll[deg]", "pitch[deg]", "yaw[deg]", "thrust[m/s]"],
+    #     use_scatter=[False]
+    # )
+
+
+    # plt.show()
 
 if __name__ == "__main__":
     main()

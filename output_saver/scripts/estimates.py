@@ -35,9 +35,11 @@ class AnafiOpticalFlowVelSaver(GenericOutputSaver):
 
         output = [
             msg.header.stamp.to_sec(),
-            msg.vector.x,
-            msg.vector.y,
-            msg.vector.z
+            # Swapped places between x and y, since the optixal-flow has a different coordinate-axis,
+            # with y on vertical and x on horizontal
+            -msg.vector.y,
+            -msg.vector.x,
+            -msg.vector.z
         ]
 
         self._save_output(output)
@@ -49,6 +51,23 @@ class AnafiPolledVelSaver(GenericOutputSaver):
         rospy.Subscriber(self.topic_name, geometry_msgs.msg.TwistStamped, self._anafi_polled_vel_data_cb)
 
     def _anafi_polled_vel_data_cb(self, msg: geometry_msgs.msg.TwistStamped):
+
+        output = [
+            msg.header.stamp.to_sec(),
+            msg.twist.linear.x,
+            msg.twist.linear.y,
+            msg.twist.linear.z
+        ]
+
+        self._save_output(output)
+
+class GuidanceSaver(GenericOutputSaver):
+    def __init__(self, config, base_dir, output_category, output_type, environment):
+        super().__init__(config, base_dir, output_category, output_type, environment)
+
+        rospy.Subscriber(self.topic_name, geometry_msgs.msg.TwistStamped, self._guidance_cb)
+
+    def _guidance_cb(self, msg: geometry_msgs.msg.TwistStamped):
 
         output = [
             msg.header.stamp.to_sec(),

@@ -3,17 +3,19 @@ node_rate: 10
 
 testing:
   is_mission_testing: true
-  mission_test_id: 5
+  mission_test_id: -2
 
+# Some of these values are quite large, but this if to 
+# offset the lag expected when running the DNN-CV
 maximum_expected_action_time_s:
   communicate: 5
-  takeoff: 5
-  land: 5
+  takeoff: 10
+  land: 10
   drop_bouya: 10
-  move_relative: 15
+  move_relative: 30 # 15
   travel_to: 120
-  track: 120
-  search: 180
+  track: 180  # 120
+  search: 240 # 180
   idle: 99999
 
 
@@ -26,10 +28,11 @@ enable_controller_service_names:
   velocity_controller: "/velocity_controller/service/enable_controller"
 
 
-horizontal_radius_of_acceptance: 5.0  # When the drone is within 5 meters from the desired point, it has travelled to the destination
-vertical_radius_of_acceptance: 7.5    # Less strict about the vertical position
+horizontal_radius_of_acceptance: 1.0  # When the drone is within 1 meter from the desired point, it has travelled to the destination
+vertical_radius_of_acceptance: 2.5    # Less strict about the vertical position
 
-max_pos_tracking_error_normed: 0.25
+horizontal_tracking_error_limit: 0.05 # 0.1
+vertical_tracking_error_limit: 0.9 #0.5 # In the simulator, this must be above 0.8
 
 locations_ned:
   helipad: [0, 0, 0]

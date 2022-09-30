@@ -10,6 +10,7 @@ import rospy
 
 import ground_truths
 import estimates
+import commands
 
 class OutputSaver():
 
@@ -65,6 +66,15 @@ class OutputSaver():
             "estimates", "anafi_polled_vel", self.environment
         )
 
+        estimates.GuidanceSaver(self.config, self.output_base_dir,
+            "estimates", "guidance_pid", self.environment
+        )
+
+        estimates.GuidanceSaver(self.config, self.output_base_dir,
+            "estimates", "guidance_pure_pursuit", self.environment
+        )
+
+
         ground_truths.DronePoseDataSaver(self.config, self.output_base_dir,
             "ground_truths", "drone_pose_helipad_frame", self.environment
         )
@@ -86,6 +96,10 @@ class OutputSaver():
 
         ground_truths.DronePoseNEDDataSaver(self.config, self.output_base_dir,
             "ground_truths", "drone_pose_ned", self.environment
+        )
+
+        commands.AnafiAttitudeCMDSaver(self.config, self.output_base_dir,
+            "commands", "attitude_cmd", self.environment
         )
 
         rospy.on_shutdown(self._on_shutdown)

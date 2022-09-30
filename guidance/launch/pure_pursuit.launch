@@ -1,9 +1,9 @@
 <launch>
     <node
         name="pure_pursuit_guidance"
-        pkg="pure_pursuit_guidance"
+        pkg="guidance"
         type="pure_pursuit.py"
         output="screen">
-      <rosparam command="load" file="$(find pure_pursuit_guidance)/config/config.yaml" />
+      <rosparam command="load" file="$(find guidance)/config/config.yaml" />
     </node>
 </launch>

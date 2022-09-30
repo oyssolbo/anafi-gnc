@@ -53,10 +53,21 @@ class TravelToAction(Actions):
 def generate_actions(mission_id : int) -> list:#(Actions):
   action_list = []
 
-  if mission_id == 0:
+  if mission_id == -2:
+    action_list.append(TakeoffAction(altitude=2))
+    action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
+    action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
+    action_list.append(TrackAction())
+    action_list.append(LandAction())
+
+  elif mission_id == -1:
+    print("Only takeoff")
+    action_list.append(TakeoffAction(altitude=1))
+
+  elif mission_id == 0:
     print("Simplest action for takeoff and landing")
     action_list.append(TakeoffAction(altitude=2))
-    action_list.append(LandAction())
+    action_list.append(TrackAction()) # No land
 
   elif mission_id == 1:
     print("Simplest action including tracking of platform")
@@ -71,6 +82,8 @@ def generate_actions(mission_id : int) -> list:#(Actions):
     action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
     action_list.append(MoveRelativeAction(np.array([-1, 0, 0, 0]).T))
     action_list.append(MoveRelativeAction(np.array([0, -1, 0, 0]).T))
+    action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
+    action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
     action_list.append(TrackAction())
     action_list.append(LandAction())
 
