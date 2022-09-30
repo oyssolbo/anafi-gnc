@@ -102,9 +102,10 @@ class PIDGuidanceLaw():
       return np.zeros((3, 1))
 
     # Using a target-position above the helipad to guide safely
-    target_position = np.array([0, 0, 0.25])
-    error = self.pos_relative_to_helipad - target_position
-    return -error
+    # target_position = np.array([0, 0, 0.25])
+    error = self.pos_relative_to_helipad #- target_position
+    error[2] = -error[2] # Convert between frames
+    return error
 
 
   def get_velocity_reference(self, pos_error_body: np.ndarray, ts: float, debug=False) -> np.ndarray:
@@ -180,6 +181,10 @@ class PIDGuidanceLaw():
       pos_error = self.__get_position_error()
 
       velocity_reference = self.get_velocity_reference(pos_error_body=pos_error, ts=timestamp)
+      print(pos_error)
+      print()
+      print(velocity_reference)
+      print("\n\n")
 
       twist_msg = TwistStamped()
       twist_msg.header.stamp = timestamp
