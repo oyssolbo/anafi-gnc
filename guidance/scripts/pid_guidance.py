@@ -181,10 +181,6 @@ class PIDGuidanceLaw():
       pos_error = self.__get_position_error()
 
       velocity_reference = self.get_velocity_reference(pos_error_body=pos_error, ts=timestamp)
-      print(pos_error)
-      print()
-      print(velocity_reference)
-      print("\n\n")
 
       twist_msg = TwistStamped()
       twist_msg.header.stamp = timestamp

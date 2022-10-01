@@ -30,7 +30,7 @@ class PurePursuitGuidanceLaw():
   """
   def __init__(self) -> None:
     node_name = rospy.get_param("~node_name", default = "pure_pursuit_guidance_node")
-    controller_rate = rospy.get_param("~rate_Hz", default = 20)
+    controller_rate = rospy.get_param("~node_rate", default = 20)
     self.dt = 1.0 / controller_rate 
 
     rospy.init_node(node_name)
@@ -189,11 +189,6 @@ class PurePursuitGuidanceLaw():
         vel_ref_unclamped = vel_target - (kappa * pos_error) / (pos_error_normed) 
       else:
         vel_ref_unclamped = zeros_3_1
-
-      print(pos_error)
-      print()
-      print(vel_ref_unclamped)
-      print("\n\n")
 
       vel_ref_x = self.__clamp(vel_ref_unclamped[0], self.vx_limits)
       vel_ref_y = self.__clamp(vel_ref_unclamped[1], self.vy_limits)
