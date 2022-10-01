@@ -1,6 +1,12 @@
 node_name: "attitude_controller_node"
 node_rate: 20
 
+use_optical_flow_velocities: true  # true -> Using velocity estimates from optical_flow
+                                # false -> Using polled velocity estimates 
+
+use_pure_pursuit_guidance: false    # true -> Using pure pursuit guidance to generate the velocity reference
+                                # false -> Using PID-guidance to generate the velocity reference
+
 attitude_limits:
   pitch: [-5, 5]  # deg
   roll: [-5, 5]   # deg
@@ -13,14 +19,14 @@ velocity_reference_model:
   T_z: 0.5
   K_z: 1
 
-pid:
+pid: 
   x_axis:
-    kp: 0.25 # -7 
-    ki: 0.01 # 0.01   # -0.1
+    kp: 0.25 #7 # 0.25 # -7 
+    ki: 0.01 # 0.01 # 0.01   # -0.1
     kd: 0
   y_axis:
-    kp: 0.25 # 7
-    ki: 0.01 # 0.01   # 0.1
+    kp: 0.25 # 7 # 0.25 # 7
+    ki: 0.01 # 0.01 # 0.01   # 0.1
     kd: 0
 
 linear_drag_model:
