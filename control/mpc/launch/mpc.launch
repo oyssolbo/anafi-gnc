@@ -1,0 +1,9 @@
+<launch>
+  <node
+    name="mpc"
+    pkg="mpc"
+    type="model_predictive_controller.py"
+    output="screen">
+    <rosparam command="load" file="$(find mpc)/config/config.yaml" />
+  </node>
+</launch>

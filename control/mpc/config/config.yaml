@@ -1,0 +1,6 @@
+node_name: "mpc_node"
+node_rate: 20
+
+attitude_limits:
+  pitch: [-5, 5]  # deg
+  roll: [-5, 5]   # deg
