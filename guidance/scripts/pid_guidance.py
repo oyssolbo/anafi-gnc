@@ -155,10 +155,7 @@ class PIDGuidanceLaw():
 
     if control3D:
       vz_reference = self._Kp_z*e_z + self._Kd_z*e_dot_z + self._Ki_z*self._error_int[2]
-      # print(e_z)
-      # print(self._Kp_z*e_z)
       vz_reference = self._clamp(vz_reference, self._vz_limits)
-      # print(vz_reference)
       velocity_reference = np.array([vx_reference, vy_reference, vz_reference], dtype=float)
     else:
       velocity_reference = np.array([vx_reference, vy_reference, 0], dtype=float)
