@@ -155,7 +155,7 @@ class VelocityController():
           debug=False
         )
 
-        att_ref_3D = np.array([-att_ref[0], -att_ref[1], 0, x_d[4]], dtype=np.float64) 
+        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, x_d[4]], dtype=np.float64) 
         attitude_cmd_msg.header.stamp = rospy.Time.now()
         attitude_cmd_msg.roll = att_ref_3D[0]   
         attitude_cmd_msg.pitch = att_ref_3D[1]
