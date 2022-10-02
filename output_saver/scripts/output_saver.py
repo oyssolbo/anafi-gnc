@@ -74,6 +74,11 @@ class OutputSaver():
             "estimates", "guidance_pure_pursuit", self.environment
         )
 
+        estimates.AnafiAttitudeSaver(self.config, self.output_base_dir, 
+            "estimates", "anafi_attitude", self.environment
+        )
+
+
 
         ground_truths.DronePoseDataSaver(self.config, self.output_base_dir,
             "ground_truths", "drone_pose_helipad_frame", self.environment
