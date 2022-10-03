@@ -30,7 +30,7 @@ class PurePursuitGuidanceLaw():
   """
   def __init__(self) -> None:
     node_name = rospy.get_param("~node_name", default = "pure_pursuit_guidance_node")
-    controller_rate = rospy.get_param("~rate_Hz", default = 20)
+    controller_rate = rospy.get_param("~node_rate", default = 20)
     self.dt = 1.0 / controller_rate 
 
     rospy.init_node(node_name)
@@ -154,9 +154,9 @@ class PurePursuitGuidanceLaw():
 
       # Using a target-position above the helipad to guide safely
       # target_position = np.array([0, 0, 0.25]).reshape((3, 1))
-      error = -self.pos_relative_to_helipad #- target_position
-      error[2] = -error[2] #- self.desired_altitude
-      return error
+      # error = -self.pos_relative_to_helipad #- target_position
+      altitude_error = self.desired_altitude + self.pos_relative_to_helipad[2] 
+      return np.array([-self.pos_relative_to_helipad[0], -self.pos_relative_to_helipad[1], altitude_error])
 
     return zeros
 
@@ -181,19 +181,16 @@ class PurePursuitGuidanceLaw():
       horizontal_error_normed = np.linalg.norm(pos_error[:2])
 
       # Control vertical position error when low horizontal error
-      if horizontal_error_normed > 0.5:
-        self.desired_altitude = -1.0
+      if horizontal_error_normed > 0.25:
+        self.desired_altitude = 0.0 #1.0
+      else:
+        self.desired_altitude = 0.0
 
       if pos_error_normed > 1e-3:
         kappa = (pos_error_normed * self.ua_max) / (np.sqrt(pos_error_normed + self.lookahead**2))
         vel_ref_unclamped = vel_target - (kappa * pos_error) / (pos_error_normed) 
       else:
         vel_ref_unclamped = zeros_3_1
-
-      print(pos_error)
-      print()
-      print(vel_ref_unclamped)
-      print("\n\n")
 
       vel_ref_x = self.__clamp(vel_ref_unclamped[0], self.vx_limits)
       vel_ref_y = self.__clamp(vel_ref_unclamped[1], self.vy_limits)

@@ -4,6 +4,8 @@ import geometry_msgs.msg
 from anafi_uav_msgs.msg import AnafiTelemetry, Heading, PointWithCovarianceStamped, EulerPose, EkfOutput, PoseStampedEuler
 
 from generic_output_saver import GenericOutputSaver
+from scipy.spatial.transform import Rotation
+import numpy as np
 
 class AnafiRawDataSaver(GenericOutputSaver):
     def __init__(self, config, base_dir, output_category, output_type, environment):
@@ -43,6 +45,34 @@ class AnafiOpticalFlowVelSaver(GenericOutputSaver):
         ]
 
         self._save_output(output)
+
+class AnafiAttitudeSaver(GenericOutputSaver):
+    def __init__(self, config, base_dir, output_category, output_type, environment):
+        super().__init__(config, base_dir, output_category, output_type, environment)
+
+        rospy.Subscriber(self.topic_name, geometry_msgs.msg.QuaternionStamped, self.attitude_cb)
+
+    def attitude_cb(self, msg: geometry_msgs.msg.QuaternionStamped):
+
+        x = msg.quaternion.x
+        y = msg.quaternion.y
+        z = msg.quaternion.z
+        w = msg.quaternion.w
+
+        rotation_matrix = Rotation.from_quat([x, y, z, w])
+        drone_rpy = rotation_matrix.as_euler('xyz')
+
+        output = [
+            msg.header.stamp.to_sec(),
+            # Swapped places between x and y, since the optixal-flow has a different coordinate-axis,
+            # with y on vertical and x on horizontal
+            drone_rpy[0] * 180 / np.pi,
+            drone_rpy[1] * 180 / np.pi,
+            drone_rpy[2] * 180 / np.pi
+        ]
+
+        self._save_output(output)
+
 
 class AnafiPolledVelSaver(GenericOutputSaver):
     def __init__(self, config, base_dir, output_category, output_type, environment):
