@@ -25,7 +25,7 @@ fi
 
 TIME=$(date +%Y-%m-%d-%H-%M-%S)
 
-ANAFI_OUTPUT_TOPICS=/anafi/image \
+ANAFI_OUTPUT_TOPICS="/anafi/image \
         /anafi/attitude \
         /anafi/gnss_location \
         /anafi/height \
@@ -36,145 +36,52 @@ ANAFI_OUTPUT_TOPICS=/anafi/image \
         /anafi/battery \
         /anafi/state \
         /anafi/pose \
-        /anafi/odometry
+        /anafi/odometry"
 
-ANAFI_CMD_TOPICS=/anafi/cmd_takeoff \
+ANAFI_CMD_TOPICS="/anafi/cmd_takeoff \
         /anafi/cmd_land \
         /anafi/cmd_emergency \
         /anafi/cmd_rpyt \
         /anafi/cmd_moveto \
         /anafi/cmd_moveby \
-        /anafi/cmd_camera 
+        /anafi/cmd_camera"
 
-DARKNET_TOPICS=/darknet_ros/bounding_boxes
+DARKNET_TOPICS="/darknet_ros/bounding_boxes"
 
-ESTIMATE_TOPICS=/estimate/dnn_cv/heading \
+ESTIMATE_TOPICS="/estimate/dnn_cv/heading \
         /estimate/dnn_cv/position \
         /estimate/ekf \
-        /estimate/tcv/pose
+        /estimate/tcv/pose"
 
-QUAlISYS_TOPICS=/qualisys/Anafi/odom \
+QUAlISYS_TOPICS="/qualisys/Anafi/odom \
         /qualisys/Anafi/pose \
         /qualisys/Anafi/velocity \
         /qualisys/Platform/odom \
         /qualisys/Platform/pose \
-        /qualisys/Platform/velocity
+        /qualisys/Platform/velocity"
 
-GNC_TOPICS=/guidance/pure_pursuit/velocity_reference \
-        /guidance/pid/velocity_reference
+GNC_TOPICS="/guidance/pure_pursuit/velocity_reference \
+        /guidance/pid/velocity_reference"
 
-STANDARD_TOPICS=$ANAFI_OUTPUT_TOPICS \
+STANDARD_TOPICS="$ANAFI_OUTPUT_TOPICS \
         $ANAFI_CMD_TOPICS \
         $DARKNET_TOPICS \
         $ESTIMATE_TOPICS \
         $GNC_TOPICS \
-        / tf 
+        /tf" 
 
 if [[ $ENV == "sim" ]]; then
     echo "Rosbagging sim topics"
     rosbag record -O $OUTPUT_DIR/$TIME \
-        $STANDARD_TOPICS \
-        # /anafi/image \
-        # /anafi/attitude \
-        # /anafi/gnss_location \
-        # /anafi/height \
-        # /anafi/optical_flow_velocities \
-        # /anafi/link_goodput \
-        # /anafi/link_quality \
-        # /anafi/wifi_rssi \
-        # /anafi/battery \
-        # /anafi/state \
-        # /anafi/pose \
-        # /anafi/odometry \
-        # /anafi/cmd_takeoff \
-        # /anafi/cmd_land \
-        # /anafi/cmd_emergency \
-        # /anafi/cmd_rpyt \ 
-        # /anafi/cmd_moveto \
-        # /anafi/cmd_moveby \
-        # /anafi/cmd_camera \
-        # /darknet_ros/bounding_boxes \
-        # /estimate/dnn_cv/heading \      
-        # /estimate/dnn_cv/position \
-        # /estimate/ekf \
-        # /estimate/tcv/pose \
-        # /tf \
-        # /guidance/pure_pursuit/velocity_reference \
-        # /guidance/pid/velocity_reference \
+        $STANDARD_TOPICS 
 elif [[ $ENV == "lab" ]]; then
     echo "Rosbagging lab topics"
     rosbag record -O $OUTPUT_DIR/$TIME \
         $STANDARD_TOPICS \
-        $QUAlISYS_TOPICS \
-        # /anafi/image \
-        # /anafi/attitude \
-        # /anafi/gnss_location \
-        # /anafi/height \
-        # /anafi/optical_flow_velocities \
-        # /anafi/link_goodput \
-        # /anafi/link_quality \
-        # /anafi/wifi_rssi \
-        # /anafi/battery \
-        # /anafi/state \
-        # /anafi/pose \
-        # /anafi/odometry \
-        # /anafi/cmd_takeoff \
-        # /anafi/cmd_land \
-        # /anafi/cmd_emergency \
-        # /anafi/cmd_rpyt \ 
-        # /anafi/cmd_moveto \
-        # /anafi/cmd_moveby \
-        # /anafi/cmd_camera \
-        # /darknet_ros/bounding_boxes \
-        # /estimate/dnn_cv/heading \      
-        # /estimate/dnn_cv/position \
-        # /estimate/ekf \
-        # /estimate/tcv/pose \
-        # /qualisys/Anafi/odom \
-        # /qualisys/Anafi/pose \
-        # /qualisys/Anafi/velocity \    
-        # /qualisys/Platform/odom \               
-        # /qualisys/Platform/pose \      
-        # /qualisys/Platform/velocity \
-        # /tf \
-        # /guidance/pure_pursuit/velocity_reference \
-        # /guidance/pid/velocity_reference \
+        $QUAlISYS_TOPICS 
 elif [[ $ENV == "real" ]]; then
     echo "Rosbagging real topics"
     rosbag record -O $OUTPUT_DIR/$TIME \
         $STANDARD_TOPICS \
-        $QUAlISYS_TOPICS \
-        # /anafi/image \
-        # /anafi/attitude \
-        # /anafi/gnss_location \
-        # /anafi/height \
-        # /anafi/optical_flow_velocities \
-        # /anafi/link_goodput \
-        # /anafi/link_quality \
-        # /anafi/wifi_rssi \
-        # /anafi/battery \
-        # /anafi/state \
-        # /anafi/pose \
-        # /anafi/odometry \
-        # /anafi/cmd_takeoff \
-        # /anafi/cmd_land \
-        # /anafi/cmd_emergency \
-        # /anafi/cmd_rpyt \ 
-        # /anafi/cmd_moveto \
-        # /anafi/cmd_moveby \
-        # /anafi/cmd_camera \
-        # /darknet_ros/bounding_boxes \
-        # /estimate/dnn_cv/heading \      
-        # /estimate/dnn_cv/position \
-        # /estimate/ekf \
-        # /estimate/tcv/pose \
-        # /qualisys/Anafi/odom \
-        # /qualisys/Anafi/pose \
-        # /qualisys/Anafi/velocity \    
-        # /qualisys/Platform/odom \               
-        # /qualisys/Platform/pose \      
-        # /qualisys/Platform/velocity \
-        # /tf \
-        # /guidance/pure_pursuit/velocity_reference \
-        # /guidance/pid/velocity_reference \
+        $QUAlISYS_TOPICS 
 fi
