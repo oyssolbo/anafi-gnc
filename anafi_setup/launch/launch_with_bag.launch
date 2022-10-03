@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+    <!-- ## PLAY ROSBAG ## -->
+    <arg name="rosbag_path" default="/home/simenallum/bagfiles/" />
+    <arg name="rosbag_timedate" default="2022-09-30-17-25-57" />
+    <arg name="node_start_delay" default="1.0" />
+    <param name="/use_sim_time" value="true"/>
+    <node pkg="rosbag" type="play" name="player" output="screen" args="--clock $(arg rosbag_path)$(arg rosbag_timedate).bag" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+        
+
+
+    <arg name="at_dronelab" default="true" />
+
+    <arg name="run_apriltags_pose_estimator" default="false" />
+    <arg name="run_ekf" default="true" />
+    <arg name="run_tcv" default="true" />
+    <arg name="run_dnncv" default="true" />
+    <arg name="run_output_saver" default="true" />
+
+    <!-- ################### -->
+    <!-- RUN GLOBAL CONFIG FILES -->
+    <!-- ################### -->
+    <rosparam command="load" file="$(find anafi_setup)/config/anafi_config.yaml"/>
+    <rosparam command="load" file="$(find drone_interface)/config/anafi/params.yaml" />
+
+    <!-- ################### -->
+    <!-- OUTPUT_SAVER -->
+    <!-- ################### -->
+    <group if="$(arg run_output_saver)">
+        <node
+            name="output_saver"
+            pkg="output_saver"
+            type="output_saver.py"
+            output="screen">
+            <param name="config_file" value="output_types.yaml" />
+            <param name="environment" value="real" />
+            <param name="/use_sim_time" value="true"/>
+        </node>
+
+        <group if="$(arg at_dronelab)">
+            <node
+                name="coordinate_transform"
+                pkg="ground_truth"
+                type="coordinate_transform.py"
+                output="screen">
+                <param name="config_file" value="config.yaml" />
+                <param name="environment" value="real" />
+                <param name="/use_sim_time" value="true"/>
+            </node>
+        </group>
+
+
+    </group>
+
+    
+
+    <!-- ################### -->
+    <!-- EKF -->
+    <!-- ################### -->
+    <group if="$(arg run_ekf)">
+        <node
+            name="perception_ekf"
+            pkg="perception_ekf"
+            type="run_ekf.py"
+            output="screen">
+            <param name="config_file" value="ekf_config.yaml" />
+            <param name="/use_sim_time" value="true"/>
+        </node>
+    </group>
+
+    <!-- ################### -->
+    <!-- DNNCV -->2022-10-1/22-31-7
+    <!-- ################### -->
+    <group if="$(arg run_dnncv)">
+        <node
+            name="dnn_cv"
+            pkg="dnncv"
+            type="dnncv.py"
+            output="screen">
+            <param name="config_file" value="dnncv_config.yaml" />
+            <param name="/use_sim_time" value="true"/>
+        </node>
+
+        <!-- DARKNET YOLO DETECTOR -->
+        <!-- Console launch prefix -->
+        <arg name="launch_prefix" default=""/>
+        <arg name="image" default="/anafi/image" />
+
+        <!-- Config and weights folder. -->
+        <arg name="yolo_weights_path"          default="$(find dnncv)/yolo_network_config/weights"/>
+        <arg name="yolo_config_path"           default="$(find dnncv)/yolo_network_config/cfg"/>
+
+        <!-- ROS and network parameter files -->
+        <arg name="ros_param_file"             default="$(find dnncv)/config/ros.yaml"/>
+        <arg name="network_param_file"         default="$(find dnncv)/config/anafi_real.yaml"/>
+
+        <!-- Load parameters -->
+        <rosparam command="load" ns="darknet_ros" file="$(arg ros_param_file)"/>
+        <rosparam command="load" ns="darknet_ros" file="$(arg network_param_file)"/>
+
+        <!-- Start darknet and ros wrapper -->
+        <node pkg="darknet_ros" type="darknet_ros" name="darknet_ros" launch-prefix="$(arg launch_prefix)">
+            <param name="weights_path"          value="$(arg yolo_weights_path)" />
+            <param name="config_path"           value="$(arg yolo_config_path)" />
+            <param name="/use_sim_time" value="true"/>
+            <remap from="camera/rgb/image_raw"  to="$(arg image)" />
+        </node>
+        
+    </group>
+
+    <!-- ################### -->
+    <!-- TCV -->
+    <!-- ################### -->
+    <group if="$(arg run_tcv)">
+        
+        <arg name="view_camera_output" default="false" />
+        <arg name="calculate_run_times" default="false" />
+
+        <node
+            name="tcv"
+            pkg="tcv"
+            type="tcv.py"
+            output="screen">
+            <param name="environment" value="real" />
+            <param name="config_file" value="config/tcv_config.yaml" />
+            <param name="view_camera_output" value="$(arg view_camera_output)"/>
+            <param name="calculate_run_times" value="$(arg calculate_run_times)"/>
+            <param name="/use_sim_time" value="true"/>
+        </node>
+    </group>
+
+    <!-- ################### -->
+    <!-- APRILTAGS POSE ESTIMATOR -->
+    <!-- ################### -->
+    <group if="$(arg run_apriltags_pose_estimator)">
+        
+        <arg name="calculate_run_times" default="false" />
+        <arg name="view_camera_output" default="true" />
+        
+        <node
+            name="apriltags_pose_estimator"
+            pkg="apriltags_pose_estimator"
+            type="apriltags_pose_estimator.py"
+            output="screen">
+            
+            <param name="environment" value="real" />
+            <param name="config_file" value="config/apriltags_config.yaml" />
+            <param name="calculate_run_times" value="$(arg calculate_run_times)"/>
+            <param name="view_camera_output" value="$(arg view_camera_output)"/>
+            <param name="/use_sim_time" value="true"/>
+        </node>
+    </group>
+    
+</launch>

@@ -45,14 +45,14 @@ ground_truths:
     max_values_stored_in_buffer: 10
 
 estimates:
-  anafi_raw_data:
-    name: anafi_raw_data
-    num_states: 6
+  anafi_height:
+    name: anafi_height
+    num_states: 1
     topic:
-      sim: /drone/out/telemetry
-      real: /drone/out/telemetry
-    file_header: "Format: timestamp[sec] vx[m], vy[m], vz[m] phi[deg], theta[deg], psi[deg]\n"
-    max_values_stored_in_buffer: 5
+      sim: /anafi/height
+      real: /anafi/height
+    file_header: "Format: timestamp[sec] z[m]\n"
+    max_values_stored_in_buffer: 10
 
   anafi_attitude:
     name: anafi_attitude
