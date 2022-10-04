@@ -18,7 +18,4 @@
   <include file="$(find guidance)/launch/pid_guidance.launch"               pass_all_args="true"/>
   <!-- <include file="$(find output_saver)/launch/real.launch"                    pass_all_args="true"/> -->
   <!-- <include file="$(find perception_ekf)/launch/perception_ekf_node.launch"  pass_all_args="true"/> -->
-
-  <!-- <include file="$(find perception)/launch/perception_sim.launch"     pass_all_args="true"/> -->
-
 </launch>
