@@ -26,7 +26,7 @@ measurements:
     topic_name: /estimate/dnn_cv/position
     sigmas: [0.5, 0.5] # std. dev. in x,y,z (m)
   drone_velocity:
-    topic_name: /anafi/optical_flow_speed
+    topic_name: /anafi/optical_flow_velocities
     sigmas: [0.4, 0.4, 0.4] # std. dev. in v_x, v_y, v_z (m/s)
   tcv_position:
     topic_name: /estimate/tcv/pose

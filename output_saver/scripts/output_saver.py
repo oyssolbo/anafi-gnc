@@ -50,8 +50,8 @@ class OutputSaver():
             "estimates", "ekf_position", self.environment
         )
 
-        estimates.AnafiRawDataSaver(self.config, self.output_base_dir,
-            "estimates", "anafi_raw_data", self.environment
+        estimates.AnafiHeightSaver(self.config, self.output_base_dir,
+            "estimates", "anafi_height", self.environment
         )
 
         estimates.TcvDataSaver(self.config, self.output_base_dir,
@@ -73,6 +73,11 @@ class OutputSaver():
         estimates.GuidanceSaver(self.config, self.output_base_dir,
             "estimates", "guidance_pure_pursuit", self.environment
         )
+
+        estimates.AnafiAttitudeSaver(self.config, self.output_base_dir, 
+            "estimates", "anafi_attitude", self.environment
+        )
+
 
 
         ground_truths.DronePoseDataSaver(self.config, self.output_base_dir,
