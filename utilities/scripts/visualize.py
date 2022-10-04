@@ -469,25 +469,36 @@ def main():
 
     # qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
 
-    title = "Guidance vs actual"
-    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([pure_pursuit, pid_guidance, optical_flow, polled_vel])#, qualisys_drone_vel])
+    # title = "Optical flow velocity compared to guidance velocity"
+    # synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([optical_flow, pid_guidance])#, qualisys_drone_vel])
+    # plotter.plot_multiple_data_series(
+    #     data=synced_vel_data, numplots=3, suptitle=title,
+    #     legends=["Optical flow", "Guidance velocity"], xlabels=["t [sec]", "t [sec]", "t [sec]"], ylabels=["vx[m/s]", "vy[m/s]", "vz[m/s]"],
+    #     use_scatter=[False, False]
+    # )
+
+    # plt.show()
+
+    title = "Comparison of guidance modules"
+    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([pure_pursuit, pid_guidance])#, qualisys_drone_vel])
     plotter.plot_multiple_data_series(
         data=synced_vel_data, numplots=3, suptitle=title,
-        legends=["Pure pursuit", "PID", "Optical flow", "Polled velocity"], xlabels=["t [sec]", "t [sec]", "t [sec]"], ylabels=["vx[m]", "vy[m]", "vz[m]"],
-        use_scatter=[False, False, False, False]
+        legends=["Pure pursuit guidance", "PID guidance"], xlabels=["t [sec]"]*3, ylabels=["vx[m/s]", "vy[m/s]", "vz[m/s]"],
+        use_scatter=[False, False]
     )
 
     plt.show()
 
+    # attitude = np.loadtxt(f"{data_dir}/estimates/anafi_attitude.txt", skiprows=2)
     # attitude_commands = np.loadtxt(f"{data_dir}/commands/attitude_cmd.txt", skiprows=2)
     # # qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
 
-    # title = "Attitude commands"
-    # synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([attitude_commands])#, qualisys_drone_vel])
+    # title = "Attitude compared to attitude reference"
+    # synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([attitude_commands, attitude])#, qualisys_drone_vel])
     # plotter.plot_multiple_data_series(
-    #     data=synced_vel_data, numplots=4, suptitle=title,
-    #     legends=["Attitude commands"], xlabels=["t [sec]"]*4, ylabels=["roll[deg]", "pitch[deg]", "yaw[deg]", "thrust[m/s]"],
-    #     use_scatter=[False]
+    #     data=synced_vel_data, numplots=2, suptitle=title,
+    #     legends=["Reference", "Measured angles"], xlabels=["t [sec]"]*2, ylabels=["roll [deg]", "pitch [deg]"],
+    #     use_scatter=[False, False]
     # )
 
 

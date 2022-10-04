@@ -1,0 +1,8 @@
+<launch>
+    <node
+        name="emulate_position_errors"
+        pkg="emulate_position_errors"
+        type="generate_position_errors.py"
+        output="screen">
+    </node>
+</launch>

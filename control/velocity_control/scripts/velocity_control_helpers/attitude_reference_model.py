@@ -61,7 +61,7 @@ class PIDReferenceGenerator(GenericAttitudeReferenceGenerator):
       debug : bool        = False
     ) -> np.ndarray:
 
-    error = (v[:2] - v_ref[:2])
+    error = (-v[:2] + v_ref[:2])
 
     e_x = error[0]
     e_y = error[1]
