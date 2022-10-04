@@ -11,20 +11,14 @@
   <!-- <rosparam command="load" file="$(find anafi_setup)/config/anafi_config.yaml"/> -->
 
   <!-- INCLUDES -->
-  <!-- <include file="$(find control_launch)/launch/control.launch"              pass_all_args="true"/> -->
-  <!-- <include file="$(find mission_launch)/launch/mission.launch"              pass_all_args="true"/> -->
+  <include file="$(find control_launch)/launch/control.launch"              pass_all_args="true"/>
+  <include file="$(find mission_launch)/launch/mission.launch"              pass_all_args="true"/>
   <!-- <include file="$(find drone_interface)/launch/anafi_sim.launch"           pass_all_args="true"/> -->
-  <!-- <include file="$(find pure_pursuit_guidance)/launch/pure_pursuit.launch"  pass_all_args="true"/> -->
-  <!-- <include file="$(find perception)/launch/perception_sim.launch"     pass_all_args="true"/> -->
+  <include file="$(find guidance)/launch/pure_pursuit.launch"               pass_all_args="true"/>
+  <include file="$(find guidance)/launch/pid_guidance.launch"               pass_all_args="true"/>
+  <!-- <include file="$(find output_saver)/launch/real.launch"                    pass_all_args="true"/> -->
+  <!-- <include file="$(find perception_ekf)/launch/perception_ekf_node.launch"  pass_all_args="true"/> -->
 
-  <!-- <node pkg="rostopic" type="rostopic" name="camera_rot_publisher" args="pub header:
-    seq: 0
-    stamp: {secs: 0, nsecs: 0}
-    frame_id: ''
-  roll: 0.0
-  pitch: -90.0
-  zoom: 0.0
-  action: 0"
-  /> -->
+  <!-- <include file="$(find perception)/launch/perception_sim.launch"     pass_all_args="true"/> -->
 
 </launch>
