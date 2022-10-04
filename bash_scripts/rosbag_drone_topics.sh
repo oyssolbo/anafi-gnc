@@ -36,7 +36,9 @@ ANAFI_OUTPUT_TOPICS="/anafi/image \
         /anafi/battery \
         /anafi/state \
         /anafi/pose \
-        /anafi/odometry"
+        /anafi/odometry \
+        /anafi/rpy \
+        /anafi/polled_body_velocities"
 
 ANAFI_CMD_TOPICS="/anafi/cmd_takeoff \
         /anafi/cmd_land \
