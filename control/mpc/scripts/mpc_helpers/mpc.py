@@ -30,7 +30,48 @@ def ode(x : casadi.MX, u : casadi.MX):
       [x[5]]
     ]
   )
-  rotation_matrix_body_to_vehicle = Rotation.from_euler("xyz", np.array([x[6], x[7], x[8]])).as_matrix()
+
+  # This is an ugly an inefficient method
+  # Doubles the complexity of the program 
+  roll = x[6]
+  pitch = x[7]
+  yaw = x[8]
+
+  cos_roll = casadi.cos(roll)
+  sin_roll = casadi.sin(roll)
+
+  cos_pitch = casadi.cos(pitch)
+  sin_pitch = casadi.sin(pitch)
+
+  cos_yaw = casadi.cos(yaw)
+  sin_yaw = casadi.sin(yaw)
+
+  rotation_matrix_x = np.array(
+    [
+      [1, 0, 0],
+      [0, cos_roll, -sin_roll],
+      [0, sin_roll, cos_roll]
+    ]
+  )
+  rotation_matrix_y = np.array(
+    [
+      [cos_pitch, 0, sin_pitch],
+      [0, 1, 0],
+      [-sin_pitch, 0, cos_pitch]
+    ]
+  )
+  rotation_matrix_z = np.array(
+    [
+      [cos_yaw, -sin_yaw, 0],
+      [sin_yaw, cos_yaw, 0],
+      [0, 0, 1]
+    ]
+  )
+  rotation_matrix_body_to_vehicle = rotation_matrix_z @ rotation_matrix_y @ rotation_matrix_x
+  rotation_matrix_body_to_vehicle = casadi.SX(rotation_matrix_body_to_vehicle)
+  rotation_matrix_vehicle_to_body = casadi.transpose(rotation_matrix_body_to_vehicle)
+
+  # rotation_matrix_body_to_vehicle = #Rotation.from_euler("xyz", np.array([x[6], x[7], x[8]])).as_matrix()
   #print(rotation_matrix_body_to_vehicle) # Rotation matrix may be NAN TODO
 
   # Derivatives
@@ -41,7 +82,7 @@ def ode(x : casadi.MX, u : casadi.MX):
       [x[5]]
     ]
   )
-  d_horizontal_vel = np.eye(2, 3) @ (((rotation_matrix_body_to_vehicle.T @ g_ned) - linear_drag_matrix @ velocity_body) / (drone_mass))
+  d_horizontal_vel = np.eye(2, 3) @ (((rotation_matrix_vehicle_to_body @ g_ned) - linear_drag_matrix @ velocity_body) / (drone_mass))
   d_vertical_vel = -u[3] # Change in velocity defined in NED, while the thrust is in ENU
 
   d_rpy = np.array(
@@ -91,7 +132,7 @@ def create_mpc(model : do_mpc.model.Model) -> do_mpc.controller.MPC:
 
   # https://www.do-mpc.com/en/latest/api/do_mpc.controller.MPC.set_param.html
   setup_mpc = {
-      'n_horizon': 10,                  # Prediction horizon
+      'n_horizon': 8,                   # Prediction horizon
       'n_robust': 0,                    # Robust horizon for a robust scenario MPC
       'open_loop': False,               # False will generate an individual cntrol input for each scenario. 
                                         # True will use the same control input for all scenarios 
@@ -102,7 +143,7 @@ def create_mpc(model : do_mpc.model.Model) -> do_mpc.controller.MPC:
       'store_full_solution': False,
       'store_lagr_multiplier': False,
       'nlpsol_opts': {
-        'ipopt.linear_solver': 'MA27',  # Efficient linear solver
+        'ipopt.linear_solver': 'mumps', # 'MA27',  # Efficient linear solver
         'ipopt.print_level': 0,         # Suppress output
         'ipopt.sb': 'yes', 
         'print_time': 0
@@ -145,7 +186,6 @@ if __name__ == '__main__':
     
     x0 = x0 + dt * np.random.normal(np.zeros((9, 1)), dt * np.ones((9, 1)))
     first_time = datetime.datetime.now()
-    print(mpc.solve())
     u0 = mpc.make_step(x0)
     later_time = datetime.datetime.now()
     print(x0)
