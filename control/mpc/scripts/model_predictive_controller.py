@@ -49,9 +49,9 @@ class ModelPredictiveController():
     self.MPC_solver = mpc.MPCSolver(mpc_parameters=self.mpc_parameters).get_mpc_solver()
 
     # Initial values
-    self.nx = self.mpc_parameters["tuning"]["nx"]
-    self.nu = self.mpc_parameters["tuning"]["nu"]
-    self.m = self.mpc_parameters["tuning"]["m"]
+    self.nx = self.mpc_parameters["tuning_parameters"]["nx"]
+    self.nu = self.mpc_parameters["tuning_parameters"]["nu"]
+    self.m = self.mpc_parameters["tuning_parameters"]["m"]
 
     self.velocities : np.ndarray = np.zeros((3, 1))
     self.position : np.ndarray = np.zeros((3, 1))
@@ -62,6 +62,9 @@ class ModelPredictiveController():
     self.ekf_timestamp : std_msgs.msg.Time = None
 
     self.is_controller_active : bool = False
+
+    # Initializing the solver with zero-input
+    self.MPC_solver.make_step(np.zeros((self.nx, self.m)))
 
 
   def _enable_controller(self, msg : SetBool):
@@ -132,9 +135,13 @@ class ModelPredictiveController():
 
 
   def spin(self) -> None:
+    x = np.zeros((9, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
-        x = self._get_current_state_estimate()
+        # x = self._get_current_state_estimate()
+        x[:3] = x[:3] + np.random.normal(np.zeros((3, 1)), self.dt * np.ones((3, 1)))
+
+        print(x)
         u = self.MPC_solver.make_step(x)
 
         attitude_cmd_msg = AttitudeCommand()
