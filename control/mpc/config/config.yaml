@@ -4,3 +4,50 @@ node_rate: 20
 attitude_limits:
   pitch: [-5, 5]  # deg
   roll: [-5, 5]   # deg
+
+mpc_config:
+  system_parameters:
+    drone:
+      mass: 0.320 # [kg]
+      aerodynamic_linear_drag_coefficients:
+        x: 0.08063504
+        y: 0.09929089
+        z: 0          # Not estimated
+
+      attitude_control_parameters:  # These must be estimated
+        time_constants:
+          roll:   0.01
+          pitch:  0.01
+        input_gains:
+          roll:   1
+          pitch:  1
+
+    gravitational_acceleration: 9.82179 # [m/s²] - for Trondheim at sea level
+    
+  tuning:
+    nx: 9
+    nu: 4
+    m: 1
+
+    objective_function:
+      q_diagonal: [2, 2, 0.5, 0.25, 0.25, 0.1, 0.5, 0.5, 0.01]
+      r_diagonal: [1, 1, 0.5, 1]
+
+    # bounds:
+    #   x:
+    #     lb: [-inf, -inf, -inf, -2, -2, -0.1, -10*np.pi/180.0, -10*np.pi/180.0, -inf]
+    #     ub: [inf, inf, inf, 2, 2, 0.1, 10*np.pi/180.0, 10*np.pi/180.0, inf]
+    #   u:
+    #     lb: [-10*np.pi/180.0, -10*np.pi/180.0, -25*np.pi/180.0, -1.0]
+    #     ub: [10*np.pi/180.0, 10*np.pi/180.0, 25*np.pi/180.0, 1.0]
+      
+    
+    prediction_horizon: 10
+    robust_horizon: 0
+    time_step: 0.2          # [s] 
+
+  solving_parameters:
+    collocation_degree: 4
+    solver_options:
+      solver: "mumps"
+      debug_level: 0
