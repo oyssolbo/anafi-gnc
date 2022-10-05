@@ -6,7 +6,7 @@ import numpy as np
 
 from scipy.spatial.transform import Rotation
 
-class MPC():
+class MPCSolver():
   def __init__(self, mpc_parameters : dict) -> None:
 
     # Extracting system parameters
