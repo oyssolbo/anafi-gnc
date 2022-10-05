@@ -132,17 +132,21 @@ class MPCSolver():
       [
         [x[3]], 
         [x[4]], 
-        [x[5]]
+        [u[3]]  # Velocity defined in NED, while the thrust is in ENU, but the body 
+                # error will be from the camera frame, such that a positive error
+                # will imply a negative value must be applied 
       ]
     )
     d_horizontal_vel = np.eye(2, 3) @ (((rotation_matrix_vehicle_to_body @ self.g_ned) - self.linear_drag_matrix @ velocity_body) / (self.drone_mass))
-    d_vertical_vel = -u[3] # Change in velocity defined in NED, while the thrust is in ENU
+    d_vertical_vel = 0  # -u[3] # Change in velocity defined in NED, while the thrust is in ENU
+                        # Unsure if the change of the vertical state should be modelled
+                        # If not, could reduce the state space by two states - this and yaw
 
     d_rpy = np.array(
       [
         [(self.k_roll * u[0] - x[6]) / self.tau_roll], 
         [(self.k_pitch * u[1] - x[7]) / self.tau_pitch], 
-        [u[2]]
+        [0]#u[2]]
       ]
     )
     return casadi.vertcat(*[d_pos, d_horizontal_vel, d_vertical_vel, d_rpy])
@@ -152,20 +156,16 @@ class MPCSolver():
     model_type = "continuous"
     self.model = do_mpc.model.Model(model_type)
 
-    x = model.set_variable(var_type='_x', var_name='x', shape=(9,1))
-    u = model.set_variable(var_type='_u', var_name='u', shape=(4,1))
+    self.x = self.model.set_variable(var_type='_x', var_name='x', shape=(9,1))
+    self.u = self.model.set_variable(var_type='_u', var_name='u', shape=(4,1))
 
-    self.model.set_rhs('x', self._ode(x, u))
+    self.model.set_rhs('x', self._ode(self.x, self.u))
     self.model.setup()
   
 
-  def _setup_objective_function(
-        self, 
-        x : casadi.SX, 
-        u : casadi.SX
-      ) -> None:  
-    xTQ = casadi.mtimes(casadi.transpose(x), casadi.SX(np.diag(self.q_diagonal)))
-    xTQx = casadi.mtimes(xTQ, x)
+  def _setup_objective_function(self) -> None:  
+    xTQ = casadi.mtimes(casadi.transpose(self.x), casadi.SX(np.diag(self.q_diagonal)))
+    xTQx = casadi.mtimes(xTQ, self.x)
 
     # uTR = casadi.mtimes(casadi.transpose(u), casadi.SX(np.diag(self.r_diagonal)))
     # uTRu = casadi.mtimes(uTR, u)
@@ -177,7 +177,7 @@ class MPCSolver():
 
 
   def get_mpc_solver(self) -> do_mpc.controller.MPC:
-    mpc = do_mpc.controller.MPC(self.model)
+    mpc_solver = do_mpc.controller.MPC(self.model)
 
     # https://www.do-mpc.com/en/latest/api/do_mpc.controller.MPC.set_param.html
     collocation_degree = self.solving_parameters["collocation_degree"]
@@ -206,19 +206,19 @@ class MPCSolver():
           'print_time': print_time
         }
     }
-    mpc.set_param(**setup_mpc)
+    mpc_solver.set_param(**setup_mpc)
 
     # Configure objective function:
-    mpc.set_objective(lterm=self.lagrange_term, mterm=self.meyer_term)
-    mpc.set_rterm(u = np.array(self.r_term)) 
+    mpc_solver.set_objective(lterm=self.lagrange_term, mterm=self.meyer_term)
+    mpc_solver.set_rterm(u=np.array(self.r_term)) 
 
     # State and input bounds - use the config file
-    mpc.bounds['lower', '_x', 'x'] = [-inf, -inf, -inf, -2, -2, -0.1, -10*np.pi/180.0, -10*np.pi/180.0, -inf]
-    mpc.bounds['upper', '_x', 'x'] = [inf, inf, inf, 2, 2, 0.1, 10*np.pi/180.0, 10*np.pi/180.0, inf]
+    mpc_solver.bounds['lower', '_x', 'x'] = [-inf, -inf, -inf, -2, -2, -0.1, -10*np.pi/180.0, -10*np.pi/180.0, -inf]
+    mpc_solver.bounds['upper', '_x', 'x'] = [inf, inf, inf, 2, 2, 0.1, 10*np.pi/180.0, 10*np.pi/180.0, inf]
     
-    mpc.bounds['lower', '_u', 'u'] = [-10*np.pi/180.0, -10*np.pi/180.0, -25*np.pi/180.0, -1.0]
-    mpc.bounds['upper', '_u', 'u'] = [10*np.pi/180.0, 10*np.pi/180.0, 25*np.pi/180.0, 1.0]
+    mpc_solver.bounds['lower', '_u', 'u'] = [-10*np.pi/180.0, -10*np.pi/180.0, -25*np.pi/180.0, -0.1]
+    mpc_solver.bounds['upper', '_u', 'u'] = [10*np.pi/180.0, 10*np.pi/180.0, 25*np.pi/180.0, 0.1]
 
-    mpc.setup()
+    mpc_solver.setup()
 
-    return mpc
+    return mpc_solver
