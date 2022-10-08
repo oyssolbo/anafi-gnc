@@ -14,7 +14,7 @@ class GeneratePositionErrors():
   desired and current position 
   """
   def __init__(self) -> None:
-    node_name = rospy.get_param("~node_name", default = "pure_pursuit_guidance_node")
+    node_name = rospy.get_param("~node_name", default = "emulate_position_error_node")
     controller_rate = rospy.get_param("~node_rate", default = 20)
     self.dt = 1.0 / controller_rate 
 
@@ -47,9 +47,9 @@ class GeneratePositionErrors():
         point_msg.position.z = np.random.normal(0.0, 0.1)
         self.position_error_pub.publish(point_msg)
         
-        # x = x + self.time_between_switch * np.random.normal(0.0, 0.5) * 0.25
-        # y = y + self.time_between_switch * np.random.normal(0.0, 0.5) * 0.25
-        # z = z + self.time_between_switch * np.random.normal(0.0, 0.25) * 0.25
+        x = x + self.time_between_switch * np.random.normal(0.0, 0.05) 
+        y = y + self.time_between_switch * np.random.normal(0.0, 0.05) 
+        z = z + self.time_between_switch * np.random.normal(0.0, 0.01)
 
         i += 1
         if i >= len(xs):
