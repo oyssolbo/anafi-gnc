@@ -30,8 +30,10 @@ mpc_config:
     m: 1
 
     objective_function:
-      q_diagonal: [2, 2, 0.5, 0.25, 0.25, 0.1, 0.5, 0.5, 0]
+      q_diagonal: [2, 2, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.01]
       r_diagonal: [1, 1, 0, 1]
+    
+    slack_constraints: [0, 0, 0, ] 
 
     # bounds:
     #   x:
@@ -47,7 +49,8 @@ mpc_config:
     time_step: 0.2          # [s] 
 
   solving_parameters:
-    collocation_degree: 4
+    collocation_degree: 2
     solver_options:
-      solver: "mumps"
+      solver: "mumps" # MA57 recommended, https://www.hsl.rl.ac.uk/ipopt/
+                      # but struggled to get it installed
       debug_level: 1

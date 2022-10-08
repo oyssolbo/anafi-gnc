@@ -187,7 +187,7 @@ class MPCSolver():
     if print_level == 0:
       print_time = 0
     else:
-      print_time = 1
+      print_time = 1 # Unsure about the unit
     setup_mpc = {
         'n_horizon': self.prediction_horizon,       # Prediction horizon
         'n_robust': self.robust_horizon,            # Robust horizon for a robust scenario MPC
@@ -200,8 +200,8 @@ class MPCSolver():
         'store_full_solution': False,
         'store_lagr_multiplier': False,
         'nlpsol_opts': {
-          'ipopt.linear_solver': solver,            # 'MA27',  # Efficient linear solver
-          'ipopt.print_level': print_level,         # Suppress output
+          'ipopt.linear_solver': solver,            
+          'ipopt.print_level': print_level,         
           'ipopt.sb': 'yes', 
           'print_time': print_time
         }

@@ -26,25 +26,7 @@ class ModelPredictiveController():
     rospy.init_node(node_name)
     self.rate = rospy.Rate(node_rate)
 
-    # Setup services
-    rospy.Service("/mpc/service/enable_controller", SetBool, self._enable_controller)
-
-    # Setup subscribers 
-    self.use_optical_flow_velocities : bool = rospy.get_param("~use_optical_flow_velocities", default = False)
-    if self.use_optical_flow_velocities:
-      rospy.loginfo("Node using optical flow velocity estimates as feedback")
-      rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self._optical_flow_velocities_cb)
-    else:
-      rospy.loginfo("Node using polled velocity estimates as feedback")
-      rospy.Subscriber("/anafi/polled_velocities", TwistStamped, self._polled_velocities_cb)
-
-    rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
-    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
-
-    # Setup publishers
-    self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
-
-    # Seting up the controller
+    # Setting up the controller
     self.mpc_parameters = rospy.get_param("~mpc_config")
     self.MPC_solver = mpc.MPCSolver(mpc_parameters=self.mpc_parameters).get_mpc_solver()
 
@@ -62,6 +44,24 @@ class ModelPredictiveController():
     self.ekf_timestamp : std_msgs.msg.Time = None
 
     self.is_controller_active : bool = False
+
+    # Setup services
+    rospy.Service("/mpc/service/enable_controller", SetBool, self._enable_controller)
+
+    # Setup subscribers 
+    self.use_optical_flow_velocities : bool = rospy.get_param("~use_optical_flow_velocities", default = False)
+    if self.use_optical_flow_velocities:
+      rospy.loginfo("Node using optical flow velocity estimates as feedback")
+      rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self._optical_flow_velocities_cb)
+    else:
+      rospy.loginfo("Node using polled velocity estimates as feedback")
+      rospy.Subscriber("/anafi/polled_body_velocities", TwistStamped, self._polled_velocities_cb)
+
+    rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
+    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
+
+    # Setup publishers
+    self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
 
     # Initializing the solver with zero-input
     self.MPC_solver.make_step(np.zeros((self.nx, self.m)))
@@ -136,22 +136,31 @@ class ModelPredictiveController():
 
   def spin(self) -> None:
     x = np.zeros((9, 1))
+    self.is_controller_active = True
     while not rospy.is_shutdown():
       if self.is_controller_active:
-        # x = self._get_current_state_estimate()
-        x[:3] = x[:3] + np.random.normal(np.zeros((3, 1)), self.dt * np.ones((3, 1)))
+        x = self._get_current_state_estimate()
+        x = np.zeros((9, 1))
+        for i in range(10):
+          x[3] = i
+          x[4] = 2*i
+          x[5] = -0.5*i
+          u = self.MPC_solver.make_step(x)
+          print(x)
+          print(u)
+        import sys 
+        sys.exit(0)
+        
 
-        print(x)
-        u = self.MPC_solver.make_step(x)
 
-        attitude_cmd_msg = AttitudeCommand()
-        attitude_cmd_msg.header.stamp = rospy.Time.now()
-        attitude_cmd_msg.roll = u[0]   
-        attitude_cmd_msg.pitch = u[1]
-        attitude_cmd_msg.yaw = u[2]
-        attitude_cmd_msg.gaz = u[3]
+        # attitude_cmd_msg = AttitudeCommand()
+        # attitude_cmd_msg.header.stamp = rospy.Time.now()
+        # attitude_cmd_msg.roll = u[0]   
+        # attitude_cmd_msg.pitch = u[1]
+        # attitude_cmd_msg.yaw = u[2]
+        # attitude_cmd_msg.gaz = u[3]
 
-        self.attitude_ref_pub.publish(attitude_cmd_msg)
+        # self.attitude_ref_pub.publish(attitude_cmd_msg)
 
       self.rate.sleep()
 
