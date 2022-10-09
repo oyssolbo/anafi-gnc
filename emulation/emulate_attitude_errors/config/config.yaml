@@ -1,0 +1,3 @@
+node_name: "emulate_attitude_error_node"
+node_rate: 20
+
