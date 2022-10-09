@@ -19,14 +19,14 @@ class MissionPlannerNode():
     self.rate = rospy.Rate(node_rate)
 
     # Setup subscribers
-    rospy.Subscriber("/anafi/state", std_msgs.msg.String, self.__drone_state_cb)
-    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self.__ekf_cb)
+    rospy.Subscriber("/anafi/state", std_msgs.msg.String, self._drone_state_cb)
+    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self._ekf_cb)
 
     self.new_drone_state_available : bool = False 
     self.pos : np.ndarray = None 
 
 
-  def __drone_state_cb(
+  def _drone_state_cb(
         self, 
         msg: std_msgs.msg.String
       ) -> None:
@@ -34,7 +34,7 @@ class MissionPlannerNode():
     self.new_drone_state_available = True
 
 
-  def __ekf_cb(
+  def _ekf_cb(
         self, 
         msg: anafi_uav_msgs.msg.PointWithCovarianceStamped
       ) -> None:

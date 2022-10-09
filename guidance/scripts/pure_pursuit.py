@@ -37,16 +37,16 @@ class PurePursuitGuidanceLaw():
     self.rate = rospy.Rate(controller_rate)
 
     # Set up subscribers 
-    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self.__ekf_cb)
-    rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self.__drone_gnss_cb)
-    # rospy.Subscriber("/platform/out/gps", sensor_msgs.msg.NavSatFix, self.__target_gnss_cb) # Could be nice to subscribe to the estimated GNSS data about the target
+    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
+    rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self._drone_gnss_cb)
+    # rospy.Subscriber("/platform/out/gps", sensor_msgs.msg.NavSatFix, self._target_gnss_cb) # Could be nice to subscribe to the estimated GNSS data about the target
     # rospy.Subscriber("/estimate/target_velocity", anafi_uav_msgs.msg.) # Would be nice to predict target movement
 
     # Set up publishers
     self.reference_velocity_publisher = rospy.Publisher("/guidance/pure_pursuit/velocity_reference", TwistStamped, queue_size=1)
 
     # Set up services
-    rospy.Service("/guidance/service/desired_pos", SetDesiredPose, self.__set_desired_ecef_pos)
+    rospy.Service("/guidance/service/desired_pos", SetDesiredPose, self._set_desired_ecef_pos)
 
     # Initialize parameters
     pure_pursuit_params = rospy.get_param("~pure_pursuit_parameters")
@@ -73,7 +73,7 @@ class PurePursuitGuidanceLaw():
     self.guidance_state : GuidanceState = GuidanceState.RELATIVE_TO_HELIPAD
 
 
-  def __set_desired_ecef_pos(self, msg : SetDesiredPoseRequest) -> SetDesiredPoseResponse:
+  def _set_desired_ecef_pos(self, msg : SetDesiredPoseRequest) -> SetDesiredPoseResponse:
     self.desired_ecef_pos = np.array([msg.x_d, msg.y_d, msg.z_d]).T
 
     res = SetDesiredPoseResponse()
@@ -81,7 +81,7 @@ class PurePursuitGuidanceLaw():
     return res
 
 
-  def __drone_gnss_cb(self, msg : sensor_msgs.msg.NavSatFix) -> None:
+  def _drone_gnss_cb(self, msg : sensor_msgs.msg.NavSatFix) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.gnss_timestamp, msg_timestamp):
@@ -106,7 +106,7 @@ class PurePursuitGuidanceLaw():
     self.ecef_pos = np.array([x, y, z]).T
 
 
-  def __ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
+  def _ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
@@ -117,7 +117,7 @@ class PurePursuitGuidanceLaw():
     self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1))
 
 
-  def __clamp(
+  def _clamp(
         self, 
         value: float, 
         limits: tuple
@@ -130,11 +130,11 @@ class PurePursuitGuidanceLaw():
       return value
 
 
-  def __request_target_ecef_position(self):
+  def _request_target_ecef_position(self):
     pass
 
 
-  def __get_valid_pos_error(self) -> np.ndarray:
+  def _get_valid_pos_error(self) -> np.ndarray:
     """
     Returns a valid error for position
     """
@@ -176,7 +176,7 @@ class PurePursuitGuidanceLaw():
         self.rate.sleep()
         continue
 
-      pos_error = self.__get_valid_pos_error()
+      pos_error = self._get_valid_pos_error()
       pos_error_normed = np.linalg.norm(pos_error)
       horizontal_error_normed = np.linalg.norm(pos_error[:2])
 
@@ -195,9 +195,9 @@ class PurePursuitGuidanceLaw():
       print(vel_ref_unclamped)
       print("\n\n")
 
-      vel_ref_x = self.__clamp(vel_ref_unclamped[0], self.vx_limits)
-      vel_ref_y = self.__clamp(vel_ref_unclamped[1], self.vy_limits)
-      vel_ref_z = self.__clamp(vel_ref_unclamped[2], self.vz_limits)
+      vel_ref_x = self._clamp(vel_ref_unclamped[0], self.vx_limits)
+      vel_ref_y = self._clamp(vel_ref_unclamped[1], self.vy_limits)
+      vel_ref_z = self._clamp(vel_ref_unclamped[2], self.vz_limits)
 
       twist_ref_msg.header.stamp = rospy.Time.now()
       twist_ref_msg.twist.linear.x = vel_ref_x
@@ -214,7 +214,7 @@ class PurePursuitGuidanceLaw():
       #   # May consider requesting ECEF-position of the target
       #   # Idle, such that it will not move until the position is updated
       #   # self.guidance_state = GuidanceState.IDLE
-      #   # self.__request_target_ecef_position() # Set the state to ECEF
+      #   # self._request_target_ecef_position() # Set the state to ECEF
       #   pass
 
         # Might consider having the action-executor to perform this action
