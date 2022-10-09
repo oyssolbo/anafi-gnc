@@ -90,7 +90,7 @@ class MPCSolver():
     # may be a better method to reduce the program complexity  
     roll = x[6]
     pitch = x[7]
-    yaw = x[8]
+    # yaw = x[8]
 
     cos_roll = 1 # casadi.cos(roll)
     sin_roll = roll # casadi.sin(roll)
@@ -132,9 +132,7 @@ class MPCSolver():
       [
         [x[3]], 
         [x[4]], 
-        [u[3]]  # Velocity defined in NED, while the thrust is in ENU, but the body 
-                # error will be from the camera frame, such that a positive error
-                # will imply a negative value must be applied 
+        [u[3]]  
       ]
     )
     d_horizontal_vel = np.eye(2, 3) @ (((rotation_matrix_vehicle_to_body @ self.g_ned) - self.linear_drag_matrix @ velocity_body) / (self.drone_mass))
@@ -196,7 +194,7 @@ class MPCSolver():
         't_step': self.time_step,                   # Time step of the MPC
         'use_terminal_bounds': False,               # Bool indicating if terminal constraints are used
         'collocation_deg': collocation_degree,      # Degree of collocation for continous models - https://www.do-mpc.com/en/latest/theory_orthogonal_collocation.html
-        'nl_cons_single_slack': False,              # True will use slacking variables for soft constraints 
+        'nl_cons_single_slack': True,               # True will use slacking variables for soft constraints 
         'store_full_solution': False,
         'store_lagr_multiplier': False,
         'nlpsol_opts': {
@@ -213,11 +211,19 @@ class MPCSolver():
     mpc_solver.set_rterm(u=np.array(self.r_term)) 
 
     # State and input bounds - use the config file
-    mpc_solver.bounds['lower', '_x', 'x'] = [-inf, -inf, -inf, -2, -2, -0.1, -10*np.pi/180.0, -10*np.pi/180.0, -inf]
-    mpc_solver.bounds['upper', '_x', 'x'] = [inf, inf, inf, 2, 2, 0.1, 10*np.pi/180.0, 10*np.pi/180.0, inf]
+    mpc_solver.bounds['lower', '_x', 'x'] = [\
+                                              -inf, -inf, -100, \
+                                              -2, -2, -0.1, \
+                                              -10*np.pi/180.0, -10*np.pi/180.0, -inf \
+                                            ]
+    mpc_solver.bounds['upper', '_x', 'x'] = [\
+                                              inf, inf, 0.5, \
+                                              2, 2, 0.1, \
+                                              10*np.pi/180.0, 10*np.pi/180.0, inf \
+                                            ]
     
-    mpc_solver.bounds['lower', '_u', 'u'] = [-10*np.pi/180.0, -10*np.pi/180.0, -25*np.pi/180.0, -0.1]
-    mpc_solver.bounds['upper', '_u', 'u'] = [10*np.pi/180.0, 10*np.pi/180.0, 25*np.pi/180.0, 0.1]
+    mpc_solver.bounds['lower', '_u', 'u'] = [-10*np.pi/180.0, -10*np.pi/180.0, -10*np.pi/180.0, -0.1]
+    mpc_solver.bounds['upper', '_u', 'u'] = [10*np.pi/180.0, 10*np.pi/180.0, 10*np.pi/180.0, 0.1]
 
     mpc_solver.setup()
 
