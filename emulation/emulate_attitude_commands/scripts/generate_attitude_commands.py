@@ -6,10 +6,6 @@ from olympe_bridge.msg import AttitudeCommand
 
 
 class GenerateAttitudeCommands():
-  """
-  Guidance law generating the desired velocity based on the 
-  desired and current position 
-  """
   def __init__(self) -> None:
     node_name = rospy.get_param("~node_name", default = "emulate_attitude_commands_node")
     controller_rate = rospy.get_param("~node_rate", default = 20)
