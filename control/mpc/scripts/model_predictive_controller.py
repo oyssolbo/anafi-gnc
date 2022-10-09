@@ -64,7 +64,9 @@ class ModelPredictiveController():
     self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
 
     # Initializing the solver with zero-input
+    rospy.logdebug("Initializing the MPC")
     self.MPC_solver.make_step(np.zeros((self.nx, self.m)))
+    rospy.loginfo("MPC initialized")
 
 
   def _enable_controller(self, msg : SetBool):
@@ -84,7 +86,7 @@ class ModelPredictiveController():
       return
     
     self.velocities_timestamp = msg_timestamp
-    self.velocities = np.array([msg.vector.x, msg.vector.y, msg.vector.z]).T
+    self.velocities = np.array([msg.vector.x, msg.vector.y, msg.vector.z]).reshape((3, 1))
 
 
   def _polled_velocities_cb(self, msg : TwistStamped) -> None:
@@ -95,7 +97,7 @@ class ModelPredictiveController():
       return
     
     self.velocities_timestamp = msg_timestamp     
-    self.velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
+    self.velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).reshape((3, 1))
 
 
   def _ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
@@ -106,7 +108,11 @@ class ModelPredictiveController():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.position = np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).T
+    # Note the negative sign on the z-position
+    # This is due to being defined in NED, such that a negative position will be 
+    # above the target. The postion estimate from the EKF will be positive, if the target 
+    # is below. It must therefore be inverted 
+    self.position = np.array([msg.position.x, msg.position.y, -msg.position.z], dtype=float).reshape((3, 1)) 
 
 
   def _attitude_cb(self, msg : QuaternionStamped) -> None:
@@ -118,14 +124,14 @@ class ModelPredictiveController():
     
     self.attitude_timestamp = msg_timestamp
     rotation = Rotation.from_quat([msg.quaternion.x, msg.quaternion.y, msg.quaternion.z, msg.quaternion.w])
-    self.attitude_rpy = rotation.as_euler('xyz')
+    self.attitude_rpy = rotation.as_euler('xyz', degrees=False).reshape((3, 1))
 
   
   def _get_current_state_estimate(self) -> np.ndarray:
     if  self.ekf_timestamp is None or self.velocities_timestamp is None or self.attitude_timestamp is None:
       return np.zeros((self.nx, self.m))
     
-    return np.hstack(
+    return np.vstack(
       [
         self.position,
         self.velocities,
@@ -136,31 +142,22 @@ class ModelPredictiveController():
 
   def spin(self) -> None:
     x = np.zeros((9, 1))
-    self.is_controller_active = True
+    # self.is_controller_active = True
     while not rospy.is_shutdown():
       if self.is_controller_active:
         x = self._get_current_state_estimate()
+        u = self.MPC_solver.make_step(x)
+
+        attitude_cmd_msg = AttitudeCommand()
+        attitude_cmd_msg.header.stamp = rospy.Time.now()
+        attitude_cmd_msg.roll = u[0]   
+        attitude_cmd_msg.pitch = u[1]
+        attitude_cmd_msg.yaw = u[2]
+        attitude_cmd_msg.gaz = u[3]
+
+        self.attitude_ref_pub.publish(attitude_cmd_msg)
+      else:
         x = np.zeros((9, 1))
-        for i in range(10):
-          x[3] = i
-          x[4] = 2*i
-          x[5] = -0.5*i
-          u = self.MPC_solver.make_step(x)
-          print(x)
-          print(u)
-        import sys 
-        sys.exit(0)
-        
-
-
-        # attitude_cmd_msg = AttitudeCommand()
-        # attitude_cmd_msg.header.stamp = rospy.Time.now()
-        # attitude_cmd_msg.roll = u[0]   
-        # attitude_cmd_msg.pitch = u[1]
-        # attitude_cmd_msg.yaw = u[2]
-        # attitude_cmd_msg.gaz = u[3]
-
-        # self.attitude_ref_pub.publish(attitude_cmd_msg)
 
       self.rate.sleep()
 
