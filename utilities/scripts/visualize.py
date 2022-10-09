@@ -462,18 +462,18 @@ def main():
     # )
 
     # # # print(f"{data_dir}/estimates/guidance_pure_pursuit.txt")
-    pure_pursuit = np.loadtxt(f"{data_dir}/estimates/guidance_pure_pursuit.txt", skiprows=2)
+    # pure_pursuit = np.loadtxt(f"{data_dir}/estimates/guidance_pure_pursuit.txt", skiprows=2)
     pid_guidance = np.loadtxt(f"{data_dir}/estimates/guidance_pid.txt", skiprows=2)
     optical_flow = np.loadtxt(f"{data_dir}/estimates/anafi_optical_flow.txt", skiprows=2)
     polled_vel = np.loadtxt(f"{data_dir}/estimates/anafi_polled_vel.txt", skiprows=2)
 
     # qualisys_drone_vel = np.loadtxt(f"{data_dir}/ground_truths/drone_velocity_body_frame_and_attitude.txt", skiprows=2)
 
-    title = "Guidance vs actual"
-    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([pure_pursuit, pid_guidance, optical_flow, polled_vel])#, qualisys_drone_vel])
+    title = "Guidance velocity vs estimated velocities"
+    synced_vel_data = plotter.sync_multiple_data_series_based_on_timestamps([pid_guidance, optical_flow, polled_vel])#, qualisys_drone_vel])
     plotter.plot_multiple_data_series(
         data=synced_vel_data, numplots=3, suptitle=title,
-        legends=["Pure pursuit", "PID", "Optical flow", "Polled velocity"], xlabels=["t [sec]", "t [sec]", "t [sec]"], ylabels=["vx[m]", "vy[m]", "vz[m]"],
+        legends=["PID guidance velocity", "Optical flow velocity", "Polled velocity"], xlabels=["t [sec]", "t [sec]", "t [sec]"], ylabels=["vx[m]", "vy[m]", "vz[m]"],
         use_scatter=[False, False, False, False]
     )
 
