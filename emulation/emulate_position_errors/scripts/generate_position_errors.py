@@ -1,8 +1,5 @@
 #!/usr/bin/python3
 
-from tracemalloc import start
-
-from pyrfc3339 import generate
 import rospy 
 import numpy as np
 from anafi_uav_msgs.msg import PointWithCovarianceStamped
@@ -25,14 +22,16 @@ class GeneratePositionErrors():
     self.position_error_pub = rospy.Publisher("/estimate/ekf", PointWithCovarianceStamped, queue_size=1)   
  
     # Set up private variables
-    self.time_between_switch : float = 0.25
+    self.time_between_switch : float = 5
 
   def generate_position_errors(self) -> None:
     start_time = rospy.Time.now()
-    xs = [0.25, 0, -0.25, 0]
-    ys = [0, 0.25, 0, -0.25]
-    zs = [1, -1, 1, -1]
-    zs = [0.1, -0.1, 0.1, -0.1]
+    xs = [0, 1, 0, -1, 0]
+    ys = [0, 0, 1, 0, -1]
+    # xs = [0, -1, 1, -1, 1]
+    # ys = [0] * 5
+    zs = [0, 1, -1, 1, -1]
+    zs = [0, 0.25, -0.25, 0.25, -0.25]
     i = 0
 
     x = 0
@@ -42,14 +41,14 @@ class GeneratePositionErrors():
       if (rospy.Time.now() - start_time).to_sec() > self.time_between_switch:
         point_msg = PointWithCovarianceStamped()
         point_msg.header.stamp = rospy.Time.now()
-        point_msg.position.x = np.random.normal(0.0, 0.25)
-        point_msg.position.y = np.random.normal(0.0, 0.25)
-        point_msg.position.z = np.random.normal(0.0, 0.1)
+        point_msg.position.x = xs[i]# np.random.normal(0.0, 0.25)
+        point_msg.position.y = ys[i]# np.random.normal(0.0, 0.25)
+        point_msg.position.z = zs[i]#zs[i]#np.random.normal(0.0, 0.1)
         self.position_error_pub.publish(point_msg)
         
-        x = x + self.time_between_switch * np.random.normal(0.0, 0.05) 
-        y = y + self.time_between_switch * np.random.normal(0.0, 0.05) 
-        z = z + self.time_between_switch * np.random.normal(0.0, 0.01)
+        # x = x + self.time_between_switch * np.random.normal(0.0, 0.05) 
+        # y = y + self.time_between_switch * np.random.normal(0.0, 0.05) 
+        # z = z + self.time_between_switch * np.random.normal(0.0, 0.01)
 
         i += 1
         if i >= len(xs):
