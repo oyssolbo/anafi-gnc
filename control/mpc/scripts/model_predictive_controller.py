@@ -108,11 +108,7 @@ class ModelPredictiveController():
       return
     
     self.ekf_timestamp = msg_timestamp
-    # Note the negative sign on the z-position
-    # This is due to being defined in NED, such that a negative position will be 
-    # above the target. The postion estimate from the EKF will be positive, if the target 
-    # is below. It must therefore be inverted 
-    self.position = np.array([msg.position.x, msg.position.y, -msg.position.z], dtype=float).reshape((3, 1)) 
+    self.position = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
 
 
   def _attitude_cb(self, msg : QuaternionStamped) -> None:
