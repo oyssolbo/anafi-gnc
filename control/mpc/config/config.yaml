@@ -30,10 +30,10 @@ mpc_config:
     m: 1
 
     objective_function:
-      q_diagonal: [5, 5, 2.5, 1, 1, 1, 1, 1, 0.001]
+      q_diagonal: [2, 2, 1.5, 2.5, 2.5, 1, 0.75, 0.75, 0.001]
       r_diagonal: [1, 1, 0, 1]
     
-    slack_constraints: [0, 0, 0] 
+    # slack_constraints: [0, 0, 0] 
 
     # bounds:
     #   x:
