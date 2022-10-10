@@ -60,7 +60,7 @@ class PurePursuitGuidanceLaw():
     self.vy_limits = velocity_limits["vy"]
     self.vz_limits = velocity_limits["vz"]
 
-    self.desired_altitude : float = 1.0
+    self.desired_altitude : float = -1.0
 
     self.ekf_timestamp : std_msgs.msg.Time = None
     self.gnss_timestamp : std_msgs.msg.Time = None
@@ -114,7 +114,7 @@ class PurePursuitGuidanceLaw():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1))
+    self.pos_relative_to_helipad = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1))
 
 
   def _clamp(
@@ -122,12 +122,7 @@ class PurePursuitGuidanceLaw():
         value: float, 
         limits: tuple
       ) -> float:
-    if value < limits[0]:
-      return limits[0]
-    elif value > limits[1]:
-      return limits[1]
-    else:
-      return value
+    return np.min([np.max([value, limits[0]]), limits[1]])
 
 
   def _request_target_ecef_position(self):
@@ -155,8 +150,8 @@ class PurePursuitGuidanceLaw():
       # Using a target-position above the helipad to guide safely
       # target_position = np.array([0, 0, 0.25]).reshape((3, 1))
       # error = -self.pos_relative_to_helipad #- target_position
-      altitude_error = self.desired_altitude + self.pos_relative_to_helipad[2] 
-      return np.array([-self.pos_relative_to_helipad[0], -self.pos_relative_to_helipad[1], altitude_error])
+      altitude_error = (self.desired_altitude + self.pos_relative_to_helipad[2]) 
+      return np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error])
 
     return zeros
 
@@ -182,7 +177,7 @@ class PurePursuitGuidanceLaw():
 
       # Control vertical position error when low horizontal error
       if horizontal_error_normed > 0.25:
-        self.desired_altitude = 0.0 #1.0
+        self.desired_altitude = -1.0 # This should utilize a sigmoid-function or something
       else:
         self.desired_altitude = 0.0
 
@@ -191,11 +186,6 @@ class PurePursuitGuidanceLaw():
         vel_ref_unclamped = vel_target - (kappa * pos_error) / (pos_error_normed) 
       else:
         vel_ref_unclamped = zeros_3_1
-
-      print(pos_error)
-      print()
-      print(vel_ref_unclamped)
-      print("\n\n")
 
       vel_ref_x = self._clamp(vel_ref_unclamped[0], self.vx_limits)
       vel_ref_y = self._clamp(vel_ref_unclamped[1], self.vy_limits)

@@ -79,12 +79,7 @@ class PIDGuidanceLaw():
 
 
   def _clamp(self, value: float, limits: tuple):
-    if value < limits[0]:
-      return limits[0]
-    elif value > limits[1]:
-      return limits[1]
-    else:
-      return value
+    return np.min([np.max([value, limits[0]]), limits[1]])
 
 
   def _ekf_cb(self, msg: PointWithCovarianceStamped) -> None:
@@ -95,16 +90,16 @@ class PIDGuidanceLaw():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z]).T
+    self.pos_relative_to_helipad = -np.array([msg.position.x, msg.position.y, msg.position.z]).T
 
   def _get_position_error(self) -> np.ndarray:
     if (self.ekf_timestamp is None):
       return np.zeros((3, 1))
 
     # Using a target-position above the helipad to guide safely
-    # target_position = np.array([0, 0, 0.25])
-    altitude_error = -self.pos_relative_to_helipad[2] # Convert between frames
-    return np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error])
+    # target_position = np.array([0, 0, -0.25])
+    # altitude_error = -self.pos_relative_to_helipad[2] # Convert between frames
+    return -self.pos_relative_to_helipad #np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error])
 
 
   def get_velocity_reference(self, pos_error_body: np.ndarray, ts: float, debug=False) -> np.ndarray:
