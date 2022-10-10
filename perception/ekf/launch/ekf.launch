@@ -11,6 +11,5 @@
         <param name="config_file" value="ekf_config.yaml" />
     </node>
 
-    <include file="$(find tcv)/launch/tcv_node.launch"></include>
-    <include file="$(find dnncv)/launch/dnnCV.launch"></include>
+    <!-- <node pkg="rosbag" type="play" name="player" output="screen" args="-s 0 /home/simenallum/2022-09-19-11-35-01.bag"/> -->
 </launch>

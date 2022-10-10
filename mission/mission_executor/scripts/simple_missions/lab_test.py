@@ -53,7 +53,14 @@ class TravelToAction(Actions):
 def generate_actions(mission_id : int) -> list:#(Actions):
   action_list = []
 
-  if mission_id == -2:
+  if mission_id == -3:
+    action_list.append(TakeoffAction(altitude=2))
+    action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
+    action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
+    action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
+    action_list.append(TrackAction())
+
+  elif mission_id == -2:
     action_list.append(TakeoffAction(altitude=2))
     action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
     action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))

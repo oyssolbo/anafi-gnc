@@ -1,6 +1,6 @@
 node_name: "pure_pursuit_guidance_node"
+node_rate: 20
 
-rate_Hz: 20
 velocity_limits:
   vx: [-0.3, 0.3]
   vy: [-0.3, 0.3]

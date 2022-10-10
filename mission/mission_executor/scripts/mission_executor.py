@@ -445,23 +445,23 @@ class MissionExecutorNode():
       # Check that the error is small enough
       if self.pos_relative_to_helipad is None:
         # No input from the EKF received
-        rospy.loginfo("EKF does not appear to be running. Exiting tracking-action")
+        rospy.logerr("EKF does not appear to be running. Exiting tracking-action")
         return (True, False, 0)
       # TODO: Add a position above the landing pad to achieve before landing
       horizontal_pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad[:2])
       vertical_pos_error = self.pos_relative_to_helipad[2]
       
-      horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.1)
-      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.2)
+      horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.05)
+      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.9)
 
       is_drone_close_to_helipad = (
         (horizontal_pos_error_normed < horizontal_tracking_error_limit) 
         and 
         (np.abs(vertical_pos_error) < vertical_tracking_error_limit) 
       )
-      print(horizontal_pos_error_normed)
-      print(vertical_pos_error)
-      print()
+      # print(horizontal_pos_error_normed)
+      # print(vertical_pos_error)
+      # print()
 
       # Obs! This should be kept over some time, such that it will not try to land 
       # if it receives a single faulty-measurement
@@ -599,14 +599,14 @@ class MissionExecutorNode():
           rospy.loginfo("Retrying takeoff")
           self._takeoff()
         
-        if self.action_str == "land" and self._check_current_action_finished(start_time, action_finished_counts)[0]:
+        if self.action_str == "land":
           # Retry landing
           rospy.loginfo("Retrying landing")
-          self._land()  
-        elif self.drone_state in ["FS_FLYING", "FS_HOVERING"]:
-          # Try to track helipad
-          self.action_str = "track"
-          self._track()
+          self.__land()  
+        # elif self.action_str == "land" and self.drone_state in ["FS_FLYING", "FS_HOVERING"]:
+        #   # Try to track helipad
+        #   self.action_str = "track"
+        #   self.__track()
 
         if self.action_str == "move_relative" and self.drone_state == "FS_FLYING":
           # Might be stuck in the state "FS_FLYING" if only controlling the altitude (on the sim, atleast)

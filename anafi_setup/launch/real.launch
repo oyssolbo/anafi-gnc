@@ -14,7 +14,8 @@
   <include file="$(find control_launch)/launch/control.launch"              pass_all_args="true"/>
   <include file="$(find mission_launch)/launch/mission.launch"              pass_all_args="true"/>
   <!-- <include file="$(find drone_interface)/launch/anafi_sim.launch"           pass_all_args="true"/> -->
-  <include file="$(find pure_pursuit_guidance)/launch/pure_pursuit.launch"  pass_all_args="true"/>
-  <!-- <include file="$(find perception)/launch/perception_sim.launch"     pass_all_args="true"/> -->
-
+  <include file="$(find guidance)/launch/pure_pursuit.launch"               pass_all_args="true"/>
+  <include file="$(find guidance)/launch/pid_guidance.launch"               pass_all_args="true"/>
+  <!-- <include file="$(find output_saver)/launch/real.launch"                    pass_all_args="true"/> -->
+  <!-- <include file="$(find perception_ekf)/launch/perception_ekf_node.launch"  pass_all_args="true"/> -->
 </launch>
