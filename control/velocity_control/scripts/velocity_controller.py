@@ -55,7 +55,7 @@ class VelocityController():
     self.use_optical_flow_velocities : bool = rospy.get_param("~use_optical_flow_velocities", default = 1)
     if self.use_optical_flow_velocities:
       rospy.loginfo("Node using optical flow velocity estimates as feedback")
-      rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self.__optical_flow_velocities_cb)
+      rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self._optical_flow_velocities_cb)
     else:
       rospy.loginfo("Node using polled velocity estimates as feedback")
       rospy.Subscriber("/anafi/polled_velocities", TwistStamped, self.__polled_velocities_cb)
@@ -63,10 +63,10 @@ class VelocityController():
     use_pure_pursuit_guidance : bool = rospy.get_param("~use_pure_pursuit_guidance", default = 0)
     if use_pure_pursuit_guidance:
       rospy.loginfo("Node using pure pursuit guidance used to generate velocity references")
-      rospy.Subscriber("/guidance/pure_pursuit/velocity_reference", TwistStamped, self.__reference_velocities_cb)
+      rospy.Subscriber("/guidance/pure_pursuit/velocity_reference", TwistStamped, self._reference_velocities_cb)
     else:
       rospy.loginfo("Node using PID-based guidance used to generate velocity references")
-      rospy.Subscriber("/guidance/pid/velocity_reference", TwistStamped, self.__reference_velocities_cb)
+      rospy.Subscriber("/guidance/pid/velocity_reference", TwistStamped, self._reference_velocities_cb)
 
     # Setup publishers
     self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
@@ -103,7 +103,7 @@ class VelocityController():
     return res 
 
 
-  def __polled_velocities_cb(self, msg : TwistStamped) -> None:
+  def _polled_velocities_cb(self, msg : TwistStamped) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.polled_velocities_timestamp, msg_timestamp):
@@ -114,7 +114,7 @@ class VelocityController():
     self.polled_velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
 
 
-  def __optical_flow_velocities_cb(self, msg : Vector3Stamped) -> None:
+  def _optical_flow_velocities_cb(self, msg : Vector3Stamped) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.optical_flow_velocities_timestamp, msg_timestamp):
@@ -133,6 +133,7 @@ class VelocityController():
     attitude_cmd_msg = AttitudeCommand()
 
     x_d = np.zeros((5, 1))
+    # self.is_controller_active = True
     while not rospy.is_shutdown():
       if self.is_controller_active:
         x_d = self.velocity_reference_model.get_filtered_reference(
@@ -155,7 +156,7 @@ class VelocityController():
           debug=False
         )
 
-        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, x_d[4]], dtype=np.float64) 
+        att_ref_3D = np.array([att_ref[0], -att_ref[1], 0, x_d[4]], dtype=np.float64) 
         attitude_cmd_msg.header.stamp = rospy.Time.now()
         attitude_cmd_msg.roll = att_ref_3D[0]   
         attitude_cmd_msg.pitch = att_ref_3D[1]
