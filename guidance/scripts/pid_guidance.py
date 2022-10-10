@@ -72,7 +72,7 @@ class PIDGuidanceLaw():
     rospy.init_node("pid_guidance_node")
     self.rate = rospy.Rate(20) # Hardcoded from the pure-pursuit guidance
 
-    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self.__ekf_cb)
+    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
     self.reference_velocity_publisher = rospy.Publisher("/guidance/pid/velocity_reference", TwistStamped, queue_size=1)
 
     self.ekf_timestamp : rospy.Time = None
@@ -87,7 +87,7 @@ class PIDGuidanceLaw():
       return value
 
 
-  def __ekf_cb(self, msg: PointWithCovarianceStamped) -> None:
+  def _ekf_cb(self, msg: PointWithCovarianceStamped) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
@@ -97,7 +97,7 @@ class PIDGuidanceLaw():
     self.ekf_timestamp = msg_timestamp
     self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z]).T
 
-  def __get_position_error(self) -> np.ndarray:
+  def _get_position_error(self) -> np.ndarray:
     if (self.ekf_timestamp is None):
       return np.zeros((3, 1))
 
@@ -178,7 +178,7 @@ class PIDGuidanceLaw():
   def run(self) -> None:
     while not rospy.is_shutdown():
       timestamp = rospy.Time.now()
-      pos_error = self.__get_position_error()
+      pos_error = self._get_position_error()
 
       velocity_reference = self.get_velocity_reference(pos_error_body=pos_error, ts=timestamp)
       print(pos_error)
