@@ -40,10 +40,25 @@ class GeneratePositionErrors():
     while not rospy.is_shutdown():
       if (rospy.Time.now() - start_time).to_sec() > self.time_between_switch:
         point_msg = PointWithCovarianceStamped()
+        # Testing with pure-pursuit 
+        # wrong sign in y
+
+        # Testing with pid guidance
+        # wrong sign in y
+        # wrong sign in x
+
+        """
+        Testing in the simulator shows that the EKF generates position estimates of 
+        the platform relative to the drone. 
+
+          x > 0, means the drone is 'behind' the platform. x > 0 should induce a forward movement ()
+          y > 0, means the drone is to the left of the platform. y > 0 should induce a movement to the right
+          z > 0, means the drone is above the platform. z > 0 should induce a downward movement
+        """
         point_msg.header.stamp = rospy.Time.now()
-        point_msg.position.x = xs[i]# np.random.normal(0.0, 0.25)
-        point_msg.position.y = ys[i]# np.random.normal(0.0, 0.25)
-        point_msg.position.z = zs[i]#zs[i]#np.random.normal(0.0, 0.1)
+        point_msg.position.x = 1 #xs[i]# np.random.normal(0.0, 0.25)
+        point_msg.position.y = 1# ys[i]# np.random.normal(0.0, 0.25)
+        point_msg.position.z = 0#zs[i]#zs[i]#np.random.normal(0.0, 0.1)
         self.position_error_pub.publish(point_msg)
         
         # x = x + self.time_between_switch * np.random.normal(0.0, 0.05) 
