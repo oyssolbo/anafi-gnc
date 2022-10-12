@@ -1,0 +1,8 @@
+<launch>
+    <node
+        name="emulate_velocity_errors"
+        pkg="emulate_velocity_errors"
+        type="generate_velocity_errors.py"
+        output="screen">
+    </node>
+</launch>

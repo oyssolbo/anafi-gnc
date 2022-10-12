@@ -39,13 +39,13 @@ class MissionExecutorNode():
     self.rate = rospy.Rate(node_rate)
 
     # Setup subscribers
-    # rospy.Subscriber("/drone/out/telemetry", anafi_uav_msgs.msg.AnafiTelemetry, self.__drone_telemetry_cb)
-    rospy.Subscriber("/anafi/state", std_msgs.msg.String, self.__drone_state_cb) 
-    rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self.__drone_gnss_cb)
-    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self.__ekf_cb)
+    # rospy.Subscriber("/drone/out/telemetry", anafi_uav_msgs.msg.AnafiTelemetry, self._drone_telemetry_cb)
+    rospy.Subscriber("/anafi/state", std_msgs.msg.String, self._drone_state_cb) 
+    rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self._drone_gnss_cb)
+    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self._ekf_cb)
 
     # Setup services
-    rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self.__set_planned_actions_srv)
+    rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self._set_planned_actions_srv)
 
     # Setup publishers
     self.takeoff_pub = rospy.Publisher("/anafi/cmd_takeoff", std_msgs.msg.Empty, queue_size=1)
@@ -86,7 +86,7 @@ class MissionExecutorNode():
       self.is_mission_testing = False 
 
 
-  def __drone_state_cb(
+  def _drone_state_cb(
         self, 
         msg: std_msgs.msg.String
       ) -> None:
@@ -103,7 +103,7 @@ class MissionExecutorNode():
     self.new_state_update = True
 
 
-  def __drone_gnss_cb(
+  def _drone_gnss_cb(
         self, 
         msg : sensor_msgs.msg.NavSatFix
       ) -> None:
@@ -131,7 +131,7 @@ class MissionExecutorNode():
     self.pos_ecef = np.array([x, y, z]).T
 
 
-  def __ekf_cb(
+  def _ekf_cb(
         self, 
         msg : anafi_uav_msgs.msg.PointWithCovarianceStamped
       ) -> None:
@@ -145,7 +145,7 @@ class MissionExecutorNode():
     self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z]).T # Is this really correct to say that this is the position relative to the helipad?
 
 
-  def __set_planned_actions_srv(
+  def _set_planned_actions_srv(
         self, 
         request : SetPlannedActionsRequest
       ) -> SetPlannedActionsResponse:
@@ -169,7 +169,7 @@ class MissionExecutorNode():
     return response
 
 
-  def __get_action_data(self):
+  def _get_action_data(self):
     if self.actions_list is None \
       or not self.actions_list:
 
@@ -190,36 +190,36 @@ class MissionExecutorNode():
     self.max_expected_action_time_s = rospy.get_param("~maximum_expected_action_time_s")[self.action_str]
 
 
-  def __get_next_action_function(self) -> Callable:    
+  def _get_next_action_function(self) -> Callable:    
     if self.action_str == "takeoff":
       rospy.loginfo("Next action: Takeoff")
-      return self.__takeoff
+      return self._takeoff
     if self.action_str == "land":
       rospy.loginfo("Next action: Land")
-      return self.__land
+      return self._land
     if self.action_str == "track":
       rospy.loginfo("Next action: Track")
-      return self.__track 
+      return self._track 
     if self.action_str == "search":
       rospy.loginfo("Next action: Search")
-      return self.__search
+      return self._search
     if self.action_str == "communicate":
       rospy.loginfo("Next action: Communicate")
-      return self.__communicate
+      return self._communicate
     if self.action_str == "travel_to":
       rospy.loginfo("Next action: Travel to")
-      return self.__travel_to 
+      return self._travel_to 
     if self.action_str == "move_relative":
       rospy.loginfo("Next action: Move relative")
-      return self.__move_relative
+      return self._move_relative
     if self.action_str == "drop_bouy":
       rospy.loginfo("Next action: Drop bouya")
-      return self.__drop_bouy
+      return self._drop_bouy
     rospy.loginfo("Next action: Idle")
-    return self.__idle
+    return self._idle
     
 
-  def __get_service_interface(
+  def _get_service_interface(
         self,
         service_type,
         service_name  : str,
@@ -229,93 +229,93 @@ class MissionExecutorNode():
     return rospy.ServiceProxy(service_name, service_type)
 
 
-  def __idle(self):
+  def _idle(self):
     rospy.loginfo("Idling")
 
 
-  def __takeoff(self):
+  def _takeoff(self):
     rospy.loginfo("Trying to take off")
 
     try:
       service_timeout = 2.0
       
       # Disable the velocity controller to have a predefined state
-      service_response = self.__get_service_interface(
+      service_response = self._get_service_interface(
         service_type=SetBool,
         service_name=self.velocity_controller_service_name,
         timeout=service_timeout 
       )(False)
       if not service_response.success:
-        rospy.logerr("[__takeoff()] Cannot disable velocity-controller")
+        rospy.logerr("[_takeoff()] Cannot disable velocity-controller")
         raise ValueError()
 
       # Taking off
       self.takeoff_pub.publish(std_msgs.msg.Empty()) 
 
     except Exception as e:
-      rospy.logerr("[__takeoff()] {} unavailable. Error {}".format(self.velocity_controller_service_name, e))
+      rospy.logerr("[_takeoff()] {} unavailable. Error {}".format(self.velocity_controller_service_name, e))
 
 
-  def __land(self):
+  def _land(self):
     rospy.loginfo("Trying to land")
 
     try:
       service_timeout = 0.5 # Short timeout might be problem due to power drain on sim... 
       
       # Disable the velocity controller
-      service_response = self.__get_service_interface(
+      service_response = self._get_service_interface(
         service_type=SetBool,
         service_name=self.velocity_controller_service_name, 
         timeout=service_timeout 
       )(False)
       if not service_response.success:
-        rospy.logerr("[__land()] Cannot disable velocity-controller")
+        rospy.logerr("[_land()] Cannot disable velocity-controller")
         raise ValueError()
 
       # Land
       self.land_pub.publish(std_msgs.msg.Empty())
 
     except Exception as e:
-      rospy.logerr("[__land()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
+      rospy.logerr("[_land()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
 
 
-  def __track(self) -> None:
+  def _track(self) -> None:
     rospy.loginfo("Trying to enable tracking of helipad")
 
     try:
       service_timeout = 2.0 
       
       # Enable the velocity controller
-      service_response = self.__get_service_interface(
+      service_response = self._get_service_interface(
         service_type=SetBool,
         service_name=self.velocity_controller_service_name, 
         timeout=service_timeout 
       )(True)
       if not service_response.success:
-        raise ValueError("[__track()] Cannot enable velocity-controller")
+        raise ValueError("[_track()] Cannot enable velocity-controller")
 
     except Exception as e:
-      rospy.logerr("[__track()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
+      rospy.logerr("[_track()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
     
   
-  def __search(self) -> None:
+  def _search(self) -> None:
     rospy.loginfo("Trying to search an area")
     # Must use some trajectory planning to generate paths or trajectories for
     # the search in the desired area
   
   
-  def __communicate(self) -> None:
+  def _communicate(self) -> None:
     # Might be split into its own thread or similar
     rospy.loginfo("Communicating")
   
 
-  def __travel_to(self) -> None:
+  def _travel_to(self) -> None:
     rospy.logwarn("Travelling to will maintain the pose, as there are uncertainties regarding the ECEF-pose")
     desired_ecef_coordinates = self.pos_ecef 
 
     # TODO: Must find a method for loading in the desired positions in NED or ECEF
     # desired_location = None 
-    # ned_coordinates = self.__load_locations_positions_ned(location=desired_location)
+    # ned_coordinates = self._load_locations_positions_ned(location=desired_location)
     
     # if self.ned_origin_in_ECEF is None:
     #   rospy.logerr("No ECEF-coordinates are available for NED's origin")
@@ -352,7 +352,7 @@ class MissionExecutorNode():
     self.move_to_ecef_pub.publish(move_to_ecef_cmd)
 
 
-  def __move_relative(self) -> None:
+  def _move_relative(self) -> None:
     # TODO: Implement a check to prevent it from crashing into the ground
     move_relative_cmd = olympe_bridge.msg.MoveByCommand()
     move_relative_cmd.header.stamp = rospy.Time.now()
@@ -364,11 +364,11 @@ class MissionExecutorNode():
     self.move_relative_pub.publish(move_relative_cmd) 
 
 
-  def __drop_bouy(self) -> None:
+  def _drop_bouy(self) -> None:
     rospy.loginfo("Dropping bouya")
 
 
-  def __check_drone_state(
+  def _check_drone_state(
         self, 
         desired_state : str,
         start_time    : rospy.Time,
@@ -391,14 +391,14 @@ class MissionExecutorNode():
 
     
 
-  def __load_locations_positions_ned(self, location : str) -> np.ndarray:
+  def _load_locations_positions_ned(self, location : str) -> np.ndarray:
     # Load the locations to travel to
     # These should be loaded in either the ECEF-frame or NED-frame
     # return rospy.get_param("~locations_ned")[location]
     return np.zeros((3, 1))
 
 
-  def __check_current_action_finished(
+  def _check_current_action_finished(
         self,
         start_time    : rospy.Time,
         current_count : int         
@@ -422,7 +422,7 @@ class MissionExecutorNode():
 
 
     if self.action_str == "takeoff":
-      return self.__check_drone_state(
+      return self._check_drone_state(
         desired_state="FS_HOVERING",
         start_time=start_time,
         current_count=current_count,
@@ -432,7 +432,7 @@ class MissionExecutorNode():
 
 
     if self.action_str == "land":
-      return self.__check_drone_state(
+      return self._check_drone_state(
         desired_state="FS_LANDED",
         start_time=start_time,
         current_count=current_count,
@@ -490,7 +490,7 @@ class MissionExecutorNode():
       vertical_radius_of_acceptance = rospy.get_param("~vertical_radius_of_acceptance", default=2.0)
       
       if self.desired_ecef_coordinates is None:
-        rospy.logerr("[__check_current_action_finished()] Desired ECEF coordinates are None")
+        rospy.logerr("[_check_current_action_finished()] Desired ECEF coordinates are None")
         return (False, False, 0)
 
       pos_error_ecef = self.desired_ecef_coordinates - self.pos_ecef
@@ -504,7 +504,7 @@ class MissionExecutorNode():
       # But at the same time, 5 counts may be enough...
       # if self.prev_drone_state != "FS_FLYING":
       #   return (False, False, 0)
-      return self.__check_drone_state(
+      return self._check_drone_state(
         desired_state="FS_HOVERING",
         start_time=start_time,
         current_count=current_count,
@@ -520,7 +520,7 @@ class MissionExecutorNode():
     return (False, False, 0)
 
 
-  def __cancel_action(self) -> None:
+  def _cancel_action(self) -> None:
     """
     Bit unsure how to develop this correctly, as there are multiple 
     complexities which will be linked to each case
@@ -553,8 +553,8 @@ class MissionExecutorNode():
 
     rospy.loginfo("Initializing")
 
-    self.__get_action_data()
-    self.__get_next_action_function()()
+    self._get_action_data()
+    self._get_next_action_function()()
     start_time = rospy.Time.now()
 
     relative_movement_ordered : np.ndarray = np.zeros((3, 1))
@@ -570,7 +570,7 @@ class MissionExecutorNode():
           self.ned_origin_in_ECEF = self.pos_ecef - relative_movement_ordered # TODO: Check that this becomes accurate enough
           gnss_position_initialized = True
 
-      check_finished = self.__check_current_action_finished(
+      check_finished = self._check_current_action_finished(
         start_time=start_time,
         current_count=action_finished_counts
       )
@@ -582,10 +582,10 @@ class MissionExecutorNode():
         # Finished with an action - start the next action
         rospy.loginfo("Drone finished with action: {}".format(self.action_str))
         
-        self.__get_action_data()
+        self._get_action_data()
         relative_movement_ordered = relative_movement_ordered + self.action_movement[:3] # TODO: Bug! Must take yaw into account
 
-        self.__get_next_action_function()()
+        self._get_next_action_function()()
         start_time = rospy.Time.now()
         action_finished_counts = 0
 
@@ -597,7 +597,7 @@ class MissionExecutorNode():
         if self.action_str == "takeoff":
           # Retry takeoff
           rospy.loginfo("Retrying takeoff")
-          self.__takeoff()
+          self._takeoff()
         
         if self.action_str == "land":
           # Retry landing
@@ -612,15 +612,15 @@ class MissionExecutorNode():
           # Might be stuck in the state "FS_FLYING" if only controlling the altitude (on the sim, atleast)
           rospy.loginfo("Trying to hover")
           self.action_movement = np.zeros((4, 1))
-          self.__move_relative()
+          self._move_relative()
 
         # Must determine a method for cancelling actions'
         # Only a small subset of actions are possible to cancel, and 
         # would require some complex logic to get it right
 
-        # self.__cancel_action()
+        # self._cancel_action()
 
-        # self.__get_next_action_function()()
+        # self._get_next_action_function()()
         start_time = rospy.Time.now() # Currently just restart the timer to prevent being spammed with messages
         # action_finished_counts = 0
       

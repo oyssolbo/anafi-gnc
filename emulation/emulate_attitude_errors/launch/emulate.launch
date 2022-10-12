@@ -1,0 +1,8 @@
+<launch>
+    <node
+        name="emulate_attitude_errors"
+        pkg="emulate_attitude_errors"
+        type="generate_attitude_errors.py"
+        output="screen">
+    </node>
+</launch>

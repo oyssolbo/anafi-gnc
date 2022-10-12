@@ -1,0 +1,8 @@
+<launch>
+    <node
+        name="emulate_attitude_commands"
+        pkg="emulate_attitude_commands"
+        type="generate_attitude_commands.py"
+        output="screen">
+    </node>
+</launch>

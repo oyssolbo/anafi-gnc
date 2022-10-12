@@ -72,22 +72,17 @@ class PIDGuidanceLaw():
     rospy.init_node("pid_guidance_node")
     self.rate = rospy.Rate(20) # Hardcoded from the pure-pursuit guidance
 
-    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self.__ekf_cb)
+    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
     self.reference_velocity_publisher = rospy.Publisher("/guidance/pid/velocity_reference", TwistStamped, queue_size=1)
 
     self.ekf_timestamp : rospy.Time = None
 
 
   def _clamp(self, value: float, limits: tuple):
-    if value < limits[0]:
-      return limits[0]
-    elif value > limits[1]:
-      return limits[1]
-    else:
-      return value
+    return np.min([np.max([value, limits[0]]), limits[1]])
 
 
-  def __ekf_cb(self, msg: PointWithCovarianceStamped) -> None:
+  def _ekf_cb(self, msg: PointWithCovarianceStamped) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
@@ -95,16 +90,16 @@ class PIDGuidanceLaw():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z]).T
+    self.pos_relative_to_helipad = -np.array([msg.position.x, msg.position.y, msg.position.z]).T
 
-  def __get_position_error(self) -> np.ndarray:
+  def _get_position_error(self) -> np.ndarray:
     if (self.ekf_timestamp is None):
       return np.zeros((3, 1))
 
     # Using a target-position above the helipad to guide safely
-    # target_position = np.array([0, 0, 0.25])
-    altitude_error = -self.pos_relative_to_helipad[2] # Convert between frames
-    return np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error])
+    # target_position = np.array([0, 0, -0.25])
+    # altitude_error = -self.pos_relative_to_helipad[2] # Convert between frames
+    return -self.pos_relative_to_helipad #np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error])
 
 
   def get_velocity_reference(self, pos_error_body: np.ndarray, ts: float, debug=False) -> np.ndarray:
@@ -177,7 +172,7 @@ class PIDGuidanceLaw():
   def run(self) -> None:
     while not rospy.is_shutdown():
       timestamp = rospy.Time.now()
-      pos_error = self.__get_position_error()
+      pos_error = self._get_position_error()
 
       velocity_reference = self.get_velocity_reference(pos_error_body=pos_error, ts=timestamp)
 

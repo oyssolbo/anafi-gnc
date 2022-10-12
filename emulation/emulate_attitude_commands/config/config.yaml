@@ -1,0 +1,2 @@
+node_name: "emulate_attitude_commands_node"
+node_rate: 20

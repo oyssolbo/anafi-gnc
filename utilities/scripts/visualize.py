@@ -462,7 +462,7 @@ def main():
     # )
 
     # # # print(f"{data_dir}/estimates/guidance_pure_pursuit.txt")
-    pure_pursuit = np.loadtxt(f"{data_dir}/estimates/guidance_pure_pursuit.txt", skiprows=2)
+    # pure_pursuit = np.loadtxt(f"{data_dir}/estimates/guidance_pure_pursuit.txt", skiprows=2)
     pid_guidance = np.loadtxt(f"{data_dir}/estimates/guidance_pid.txt", skiprows=2)
     optical_flow = np.loadtxt(f"{data_dir}/estimates/anafi_optical_flow.txt", skiprows=2)
     polled_vel = np.loadtxt(f"{data_dir}/estimates/anafi_polled_vel.txt", skiprows=2)
