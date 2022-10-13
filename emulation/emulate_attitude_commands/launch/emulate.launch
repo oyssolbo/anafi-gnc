@@ -1,4 +1,12 @@
 <launch>
+    <arg name="estimate_models"/>
+    <arg name="estimate_roll_models" default="true"/>
+    <arg name="estimate_pitch_models" default="false"/>
+
+    <param name="estimate_models" value="$(arg estimate_models)"/>
+    <param name="estimate_roll_models" value="$(arg estimate_roll_models)"/>
+    <param name="estimate_pitch_models" value="$(arg estimate_pitch_models)"/>
+
     <node
         name="emulate_attitude_commands"
         pkg="emulate_attitude_commands"

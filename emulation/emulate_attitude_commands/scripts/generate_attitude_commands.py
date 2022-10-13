@@ -18,12 +18,20 @@ class GenerateAttitudeCommands():
     self.attitude_command_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)   
  
     # Set up private variables
-    self.time_between_switch : float = 2
+    self.estimate_models : bool = rospy.get_param("/estimate_models", default=False)
+    if self.estimate_models:
+      self.estimate_roll_models : bool = rospy.get_param("/estimate_roll_models", default=False)
+      self.estimate_pitch_models : bool = rospy.get_param("/estimate_pitch_models", default=False)
+
+      self.frequency : int = 1 
+
+    self.time_to_stabilize : float = 1.0
 
     # First order reference model for roll and pitch
-    self.tau_attitude = 0.1
+    self.tau_attitude = 0.01
     self.Ad = -np.eye(2)
-    self.Bd = np.eye((2))
+    self.Bd = np.eye(2)
+
 
   def get_filtered_reference(
         self, 
@@ -57,7 +65,7 @@ class GenerateAttitudeCommands():
       cmd_msg.gaz = 0#1
       self.attitude_command_pub.publish(cmd_msg)
       
-      if (rospy.Time.now() - start_time).to_sec() > self.time_between_switch:
+      if (rospy.Time.now() - start_time).to_sec() > self.time_to_stabilize:
 
         attitude_reference = np.array([roll[i], pitch[i]]).T
         # i += 1
