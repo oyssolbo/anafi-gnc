@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(perception_ekf)
+project(old_perception_ekf)
 
 
 ## Find catkin macros and libraries
