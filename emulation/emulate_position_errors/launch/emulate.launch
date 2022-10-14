@@ -1,4 +1,10 @@
 <launch>
+    <arg name="use_external_pos_estimates"/>
+    <arg name="use_qualisys" default="true"/> <!-- If false, will default to using GNSS if use_external_pos_estimates = true -->
+
+    <param name="use_external_pos_estimates" value="$(arg use_external_pos_estimates)"/>
+    <param name="use_qualisys" value="$(arg use_qualisys)"/>
+
     <node
         name="emulate_position_errors"
         pkg="emulate_position_errors"
