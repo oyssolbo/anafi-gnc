@@ -38,14 +38,14 @@ class GeneratePositionErrors():
       self.rot_matrix_body_to_vehicle : np.ndarray = None
 
       if use_qualisys:
-        rospy.Service("/qualisys/Anafi/pose", PoseStamped, self._qualisys_cb)
+        rospy.Subscriber("/qualisys/Anafi/pose", PoseStamped, self._qualisys_cb)
       else:
-        rospy.Service("/anafi/pose", PoseStamped, self._sim_cb)
+        rospy.Subscriber("/anafi/pose", PoseStamped, self._sim_cb)
 
     self.time_between_switch : float = 5
 
 
-  def _is_new_msg_stamp(self, newest_stamp : rospy.Time, oldest_stamp : rospy.Time) -> bool:
+  def _is_new_msg_stamp(self, oldest_stamp : rospy.Time, newest_stamp : rospy.Time) -> bool:
     if oldest_stamp is None:
       return True
     return (newest_stamp - oldest_stamp).to_sec() > 0
@@ -61,7 +61,7 @@ class GeneratePositionErrors():
     # If these are zero, no GNSS-message was received
     pos_list = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
     quat_list = [msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w]
-    if all(pos_list == 0):
+    if all(val == 0 for val in pos_list):
       # No position fix
       return 
 
@@ -75,7 +75,10 @@ class GeneratePositionErrors():
     x, y, z = pyproj.transform(lla, ecef, longitude_deg, latitude_deg, altitude_m, radians=False)
     
     self.pos_estimate_timestamp = msg_timestamp
-    self.rot_matrix_body_to_vehicle = Rotation.from_quat(quat_list)
+    rpy = Rotation.from_quat(quat_list).as_euler("xyz", degrees=False)
+    rpy[0] = 0
+    rpy[1] = 0
+    self.rot_matrix_body_to_vehicle = Rotation.from_euler("xyz", rpy).as_matrix()
 
     # Note that this is in ECEF. Assumption to use it for NED only valid for small movements
     estimated_pos_ecef = np.array([x, y, z], dtype=np.float).T   
@@ -95,8 +98,11 @@ class GeneratePositionErrors():
     self.pos_estimate_timestamp = msg_timestamp     
     estimated_pos_ned = np.array([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z], dtype=np.float)
     quat_list = [msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w]
-    self.rot_matrix_body_to_vehicle = Rotation.from_quat(quat_list)
-    
+    rpy = Rotation.from_quat(quat_list).as_euler("xyz", degrees=False)
+    rpy[0] = 0
+    rpy[1] = 0
+    self.rot_matrix_body_to_vehicle = Rotation.from_euler("xyz", rpy).as_matrix()
+
     if self.initial_pos is None:
       self.initial_pos = estimated_pos_ned
     self.estimated_pos_ned = estimated_pos_ned
@@ -127,21 +133,19 @@ class GeneratePositionErrors():
       
       if self.use_external_pos_estimates:
         if self.initial_pos is not None and self.rot_matrix_body_to_vehicle is not None:
-          # Realised that this will be somewhat difficult, as we don't have 
-          # any idea of the transformations between the frames
           x_des_ned = xs_ned[idx]
           y_des_ned = ys_ned[idx]
           z_des_ned = zs_ned[idx]
 
           # Subtracting the initial is to express things with the origin as the starting location 
-          pos_desired_vehicle = np.array([x_des_ned, y_des_ned, z_des_ned], dtype=np.float) - self.initial_pos
-          pos_vehicle = (self.estimated_pos_ned - self.initial_pos) 
+          pos_desired_vehicle = np.array([x_des_ned, y_des_ned, z_des_ned], dtype=np.float) + self.initial_pos
+          pos_vehicle = (self.estimated_pos_ned) 
 
           pos_diff_vehicle = pos_desired_vehicle - pos_vehicle
-          pos_diff_body = (self.rot_matrix_body_to_vehicle.T) @ pos_diff_vehicle 
+          pos_diff_body = self.rot_matrix_body_to_vehicle.T @ pos_diff_vehicle 
 
           # Circle of acceptance
-          if np.linalg.norm(pos_diff_body[:2]) < 0.2: 
+          if np.linalg.norm(pos_diff_body[:2]) < 0.15: 
             dx = 0
             dy = 0
             dz = 0
@@ -153,7 +157,7 @@ class GeneratePositionErrors():
           else:
             dx = pos_diff_body[0]
             dy = pos_diff_body[1]
-            dz = 0                # Assuming a constant altitude, meaning that the drone is already airborne
+            dz = pos_diff_body[2]                # Assuming a constant altitude, meaning that the drone is already airborne
 
 
       else:
