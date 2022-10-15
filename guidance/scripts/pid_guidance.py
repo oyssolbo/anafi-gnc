@@ -1,14 +1,9 @@
 #!/usr/bin/python3
 
 import rospy 
-import std_msgs.msg
-import sensor_msgs.msg
-import pyproj
-
 from geometry_msgs.msg import TwistStamped
 
-from anafi_uav_msgs.msg import PointWithCovarianceStamped, ReferenceStates
-from anafi_uav_msgs.srv import SetDesiredPose, SetDesiredPoseRequest, SetDesiredPoseResponse
+from anafi_uav_msgs.msg import PointWithCovarianceStamped
 
 import numpy as np
 import guidance_helpers.utilities as utilities
@@ -41,7 +36,6 @@ class PIDGuidanceLaw():
     #   vy: [-0.3, 0.3]
     #   vz: [-0.1, 0.1]
 
-
     self._Kp_x = 0.5  # params["x_axis"]["kp"]
     self._Ki_x = 0    # params["x_axis"]["ki"]
     self._Kd_x = 0    # params["x_axis"]["kd"]
@@ -68,7 +62,6 @@ class PIDGuidanceLaw():
     self._error_int = np.zeros(3)
     self._prev_error = np.zeros(3)
 
-
     rospy.init_node("pid_guidance_node")
     self.rate = rospy.Rate(20) # Hardcoded from the pure-pursuit guidance
 
@@ -90,7 +83,8 @@ class PIDGuidanceLaw():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = -np.array([msg.position.x, msg.position.y, msg.position.z]).T
+    self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z], dtype=np.float).T
+
 
   def _get_position_error(self) -> np.ndarray:
     if (self.ekf_timestamp is None):
@@ -99,7 +93,10 @@ class PIDGuidanceLaw():
     # Using a target-position above the helipad to guide safely
     # target_position = np.array([0, 0, -0.25])
     # altitude_error = -self.pos_relative_to_helipad[2] # Convert between frames
-    return -self.pos_relative_to_helipad #np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error])
+    altitude_error = self.pos_relative_to_helipad[2]
+    if np.linalg.norm(self.pos_relative_to_helipad[:2]) > 0.2:
+      altitude_error = altitude_error - 1
+    return np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error]) 
 
 
   def get_velocity_reference(self, pos_error_body: np.ndarray, ts: float, debug=False) -> np.ndarray:
