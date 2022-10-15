@@ -58,7 +58,7 @@ class VelocityController():
       rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self._optical_flow_velocities_cb)
     else:
       rospy.loginfo("Node using polled velocity estimates as feedback")
-      rospy.Subscriber("/anafi/polled_velocities", TwistStamped, self.__polled_velocities_cb)
+      rospy.Subscriber("/anafi/polled_velocities", TwistStamped, self._polled_velocities_cb)
 
     use_pure_pursuit_guidance : bool = rospy.get_param("~use_pure_pursuit_guidance", default = 0)
     if use_pure_pursuit_guidance:
@@ -126,7 +126,7 @@ class VelocityController():
     # Important: 
     # The signs and order of elements are different for the optical flow compared to the 
     # polled-velocities. This is due to having the frame defined in the images, and not in body
-    self.optical_flow_velocities = np.array([-msg.vector.y, -msg.vector.x, -msg.vector.z]).T 
+    self.optical_flow_velocities = -np.array([msg.vector.y, msg.vector.x, msg.vector.z]).T 
 
 
   def publish_attitude_ref(self) -> None:
