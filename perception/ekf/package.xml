@@ -16,16 +16,16 @@
   <build_depend>rospy</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>anafi_uav_msgs</build_depend>
-  <build_depend>utilities</build_depend>
+  <build_depend>old_utilities</build_depend>
 
   <build_export_depend>anafi_uav_msgs</build_export_depend>
-  <build_export_depend>utilities</build_export_depend>
+  <build_export_depend>old_utilities</build_export_depend>
 
   <exec_depend>rospy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>anafi_uav_msgs</exec_depend>
-  <exec_depend>utilities</exec_depend>
+  <exec_depend>old_utilities</exec_depend>
 
 
 </package>
