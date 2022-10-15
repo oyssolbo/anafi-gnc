@@ -88,7 +88,7 @@ class PurePursuitGuidanceLaw():
       # Old message
       return
 
-    gnss_status = msg.status
+    gnss_status = msg.status.status
     if gnss_status == -1:
       # No position fix
       return 
