@@ -42,7 +42,7 @@ class GeneratePositionErrors():
       else:
         rospy.Subscriber("/anafi/pose", PoseStamped, self._sim_cb)
 
-    self.time_between_switch : float = 5
+    self.time_between_switch : float = 1
 
 
   def _is_new_msg_stamp(self, oldest_stamp : rospy.Time, newest_stamp : rospy.Time) -> bool:
@@ -120,9 +120,9 @@ class GeneratePositionErrors():
 
     start_time = rospy.Time.now()
 
-    xs_ned = [0, 0.5, 0, -0.5, 0]
-    ys_ned = [0, 0, 0.5, 0, -0.5]
-    zs_ned = [0] * 5 
+    xs_ned = [0, 0.5, 0, 0,   0, -0.5, 0,  0]
+    ys_ned = [0, 0,   0, 0.5, 0,  0,   0, -0.5]
+    zs_ned = [0] * 8 
     
     idx = 0
 
@@ -163,7 +163,7 @@ class GeneratePositionErrors():
       else:
         dx = xs_ned[idx]
         dy = ys_ned[idx]
-        dz = 0 #zs_ned[idx]
+        dz = zs_ned[idx]
 
         # x = x + self.time_between_switch * np.random.normal(0.0, 0.05) 
         # y = y + self.time_between_switch * np.random.normal(0.0, 0.05) 
@@ -174,7 +174,7 @@ class GeneratePositionErrors():
           if idx >= len(xs_ned):
             idx = 0
 
-            start_time = rospy.Time.now()
+          start_time = rospy.Time.now()
 
       point_msg = PointWithCovarianceStamped()
       point_msg.header.stamp = rospy.Time.now()
