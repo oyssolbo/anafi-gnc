@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>perception_ekf</name>
+  <name>old_perception_ekf</name>
   <version>0.0.0</version>
-  <description>The perception_ekf package</description>
+  <description>The old_perception_ekf package</description>
 
   <maintainer email="killah@todo.todo">TODO</maintainer>
   <license>TODO</license>

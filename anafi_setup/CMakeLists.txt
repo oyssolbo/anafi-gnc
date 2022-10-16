@@ -1,2 +1,2 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(anafi_setup)
+project(old_anafi_setup)
