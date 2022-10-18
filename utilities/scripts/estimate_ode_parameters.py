@@ -160,7 +160,10 @@ class LSEstimateODEParameters:
       x = x + self.dt * x_dot 
       y_hat = x 
 
-      errors += np.abs(y_hat - self.y[i])    
+      if np.isnan(y_hat - self.y[i]):
+        break
+
+      errors += np.abs(y_hat - self.y[i])  
     return errors
 
   def optimize(self):
