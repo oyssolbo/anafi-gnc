@@ -10,6 +10,7 @@ from bagpy import bagreader
 from scipy.spatial.transform import Rotation
 from functools import reduce
 
+#rosbag = bagreader("/home/msccomputer/catkin_ws/src/anafi_msc/out/rosbag/lab/estimate_pitch_models/2022-10-18-14-54-19.bag")
 rosbag = bagreader("/home/msccomputer/catkin_ws/src/anafi_msc/out/rosbag/lab/lab_testing_16_10_rosbag_attitude_roll_testing/2022-10-16-11-04-39.bag")
 
 def drop_columns_with_name_in_df(df, name : str):
@@ -61,13 +62,13 @@ def correct_offsets_rpy(df, offsets_rpy):
 
 def extract_u(df):
   t_roll_cmd_start = 0
-  t_pitch_cmd_start = 0
+  t_pitch_cmd_start = 0# 183
 
   prev_roll_cmd = 0
   prev_pitch_cmd = 0
 
   t_roll_cmd_end = 147 #0 # hardcoded
-  t_pitch_cmd_end = 0
+  t_pitch_cmd_end = 0 # 242
 
   has_roll_flattened = False 
   has_pitch_flattened = False
@@ -240,18 +241,20 @@ if __name__ == '__main__':
   dt = get_dt(merged_frame)
   # print(dt)
 
-  # df_u, start_end_indeces, angle_str = extract_u(merged_frame)
-  # df_y = extract_y(merged_frame, angle_str, start_end_indeces[0], start_end_indeces[1])
+  df_u, start_end_indeces, angle_str = extract_u(merged_frame)
+  df_y = extract_y(merged_frame, angle_str, start_end_indeces[0], start_end_indeces[1])
+  angle_str = "roll"
   # print(df_y.to_numpy())
   # print(start_end_indeces)
   # df_y.plot()
   # df_u.plot()
   # plt.show()
-  df_u = merged_frame["cmd_roll"]
-  df_y = merged_frame["roll"]
-  df_y = df_y.shift(-offset_y_timesteps)
+  #df_u = merged_frame["cmd_pitch"]
+  #df_y = merged_frame["pitch"]
+  #df_y = df_y.shift(-offset_y_timesteps)
   u = df_u.to_numpy()
   y = df_y.to_numpy()
+  y = y + np.ones_like(y) * offsets_rpy[1]
 
   k_hat =  0.85 
   tau_hat = 0.15
@@ -286,8 +289,8 @@ if __name__ == '__main__':
 
   plt.plot(y)
   plt.plot(y_hat_arr)
-  plt.legend(["measured roll", "theoretical roll"])
-  plt.title("Measured compared to theoretical roll solution. Using:\n tau = {}\n k = {}".format(tau_est, k_est))
+  plt.legend([f"measured {angle_str}", f"theoretical {angle_str}"])
+  plt.title("Measured compared to theoretical {} solution. Using:\n tau = {}\n k = {}".format(angle_str, tau_est, k_est))
   plt.xlabel("timestep")
   plt.ylabel("angle [rad]")
   plt.show()
