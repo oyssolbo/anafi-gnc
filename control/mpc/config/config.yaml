@@ -51,6 +51,6 @@ mpc_config:
   solving_parameters:
     collocation_degree: 2
     solver_options:
-      solver: "mumps" # MA57 recommended, https://www.hsl.rl.ac.uk/ipopt/
+      solver: "MA57"  # MA57 is recommended, https://www.hsl.rl.ac.uk/ipopt/
                       # but struggled to get it installed
       debug_level: 0
