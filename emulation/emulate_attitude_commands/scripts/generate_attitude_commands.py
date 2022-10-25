@@ -21,7 +21,7 @@ class GenerateAttitudeCommands():
     self.estimate_models : bool = rospy.get_param("/estimate_models", default=False)
     if self.estimate_models:
       self.estimate_roll_models : bool = rospy.get_param("/estimate_roll_models", default=False)
-      self.estimate_pitch_models : bool = rospy.get_param("/estimate_pitch_models", default=False)
+      self.estimate_pitch_models = not self.estimate_roll_models
 
       self.frequency : float = 0.5  
 

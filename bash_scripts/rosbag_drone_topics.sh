@@ -38,7 +38,11 @@ ANAFI_OUTPUT_TOPICS="/anafi/image \
         /anafi/pose \
         /anafi/odometry \
         /anafi/rpy \
-        /anafi/polled_body_velocities"
+        /anafi/polled_body_velocities \
+        /anafi/link_quality \
+        /anafi/link_goodput \
+        /anafi/wifi_rssi \
+        /anafi/msg_latency"
 
 ANAFI_CMD_TOPICS="/anafi/cmd_takeoff \
         /anafi/cmd_land \
@@ -70,7 +74,7 @@ STANDARD_TOPICS="$ANAFI_OUTPUT_TOPICS \
         $DARKNET_TOPICS \
         $ESTIMATE_TOPICS \
         $GNC_TOPICS \
-        /tf" 
+        /tf"
 
 if [[ $ENV == "sim" ]]; then
     echo "Rosbagging sim topics"
