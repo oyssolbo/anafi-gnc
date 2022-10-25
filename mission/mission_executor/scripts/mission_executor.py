@@ -94,7 +94,7 @@ class MissionExecutorNode():
     #                   ["LANDED", "MOTOR_RAMPING", "TAKINGOFF", "HOVERING", "FLYING", "LANDING", "EMERGENCY"]
     flying_states = ["FS_LANDED", "FS_MOTOR_RAMPING", "FS_TAKINGOFF", "FS_HOVERING", "FS_FLYING", "FS_LANDING", "FS_EMERGENCY"]
     if msg.data not in flying_states:
-      rospy.logdebug("Unknown status message: {}".format(msg.data))
+      # rospy.logdebug("Unknown status message: {}".format(msg.data))
       return
 
     if self.prev_drone_state != msg.data:
@@ -142,7 +142,7 @@ class MissionExecutorNode():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z]).T # Is this really correct to say that this is the position relative to the helipad?
+    self.pos_relative_to_helipad = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
 
 
   def _set_planned_actions_srv(
@@ -175,6 +175,7 @@ class MissionExecutorNode():
 
       self.action_str = "idle"
       self.action_movement = np.zeros((4, 1))
+      self.action_desired_time = -1
     
     else:
       # Doing it inefficient, since deque would not remove leftmost element from popleft() 
@@ -186,6 +187,7 @@ class MissionExecutorNode():
 
       self.action_str = action.get_action_str()
       self.action_movement = action.get_action_movement().reshape((4, 1))
+      self.action_desired_time = action.get_action_time()
 
     self.max_expected_action_time_s = rospy.get_param("~maximum_expected_action_time_s")[self.action_str]
 
@@ -215,6 +217,9 @@ class MissionExecutorNode():
     if self.action_str == "drop_bouy":
       rospy.loginfo("Next action: Drop bouya")
       return self._drop_bouy
+    if self.action_str == "hover":
+      rospy.loginfo("Next action: Hover")
+      return self._hover
     rospy.loginfo("Next action: Idle")
     return self._idle
     
@@ -260,7 +265,7 @@ class MissionExecutorNode():
     rospy.loginfo("Trying to land")
 
     try:
-      service_timeout = 0.5 # Short timeout might be problem due to power drain on sim... 
+      service_timeout = 0.5 # Short timeout might be problem due to power drain when running the perception nodes...
       
       # Disable the velocity controller
       service_response = self._get_service_interface(
@@ -364,8 +369,19 @@ class MissionExecutorNode():
     self.move_relative_pub.publish(move_relative_cmd) 
 
 
+  def _hover(self) -> None:
+    if self.drone_state in ["FS_LANDING", "FS_LANDED"]:
+      # Not try to hover if the drone is trying to land
+      rospy.logerr("Drone trying to land. Hovering is unavailable")
+      return 
+    
+    rospy.loginfo("Trying to hover")
+    self.action_movement = np.zeros((4, 1))
+    self._move_relative()
+
+
   def _drop_bouy(self) -> None:
-    rospy.loginfo("Dropping bouya")
+    rospy.logwarn("Dropping bouya not implemented")
 
 
   def _check_drone_state(
@@ -447,6 +463,7 @@ class MissionExecutorNode():
         # No input from the EKF received
         rospy.logerr("EKF does not appear to be running. Exiting tracking-action")
         return (True, False, 0)
+
       # TODO: Add a position above the landing pad to achieve before landing
       horizontal_pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad[:2])
       vertical_pos_error = self.pos_relative_to_helipad[2]
@@ -454,21 +471,25 @@ class MissionExecutorNode():
       horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.05)
       vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.9)
 
+      # Check whether the drone is close enough to the helipad
       is_drone_close_to_helipad = (
         (horizontal_pos_error_normed < horizontal_tracking_error_limit) 
         and 
         (np.abs(vertical_pos_error) < vertical_tracking_error_limit) 
       )
-      # print(horizontal_pos_error_normed)
-      # print(vertical_pos_error)
-      # print()
 
-      # Obs! This should be kept over some time, such that it will not try to land 
-      # if it receives a single faulty-measurement
-      if is_drone_close_to_helipad:
+      # Check whether the horizontal velocity is low enough, such that it does not try
+      # to land if it suddenly gets high velocities in one direction
+      is_velocity_low_enough = True
+
+      is_drone_ready_to_land = (is_drone_close_to_helipad and is_velocity_low_enough)
+
+      if is_drone_ready_to_land:
         current_count += 1
+      else:
+        current_count = 0
 
-      return (is_drone_close_to_helipad and current_count >= 3, False, current_count) 
+      return (is_drone_ready_to_land and current_count >= 3, False, current_count) 
 
 
     # The different actions are set as True, since these are not implemented
@@ -517,6 +538,19 @@ class MissionExecutorNode():
       return (True, False, 0)
 
 
+    if self.action_str == "hover":
+      drone_state = self._check_drone_state(
+        desired_state="FS_HOVERING",
+        start_time=start_time,
+        current_count=current_count,
+        min_count=5,
+        max_wait_time=self.max_expected_action_time_s
+      )
+      # if not drone_state[0]:
+      #   self._hover()
+      return (((rospy.Time.now() - start_time).to_sec() >= self.action_desired_time) and drone_state[0], False, drone_state[2])
+
+
     return (False, False, 0)
 
 
@@ -535,20 +569,16 @@ class MissionExecutorNode():
         Should the current action be cancelled or should it continue?
     2. What should occur if actions are taking too long? Should they 
         be preempted / cancelled? 
-    3. How to include information about f(Mission):included in the message?
+    3. How to include information about mission position?
 
     Things that could cause an action to be cancelled:
     Takes too long
     Ordered from the planner that the current action must be aborted
-    Current action has finished
 
     But what is going to happen if a new set of requested actions are received?
     Should one continue to finish the current action, or should one just start 
     with the new actions? Could be some mediation between the planner and the 
     executor 
-
-    Have a discussion with Simen about this, because from a planning perspective
-    there will be situations when the system should be replanned
     """
 
     rospy.loginfo("Initializing")
@@ -583,36 +613,35 @@ class MissionExecutorNode():
         rospy.loginfo("Drone finished with action: {}".format(self.action_str))
         
         self._get_action_data()
-        relative_movement_ordered = relative_movement_ordered + self.action_movement[:3] # TODO: Bug! Must take yaw into account
+        relative_movement_ordered = relative_movement_ordered + self.action_movement[:3] # TODO: Bug! Does not account for yaw 
 
         self._get_next_action_function()()
         start_time = rospy.Time.now()
         action_finished_counts = 0
 
-      elif has_action_execution_exceeded_limit or self.is_ordered_to_cancel_current_action:
+      elif has_action_execution_exceeded_limit:
         
         # TODO: Move this into own function(s)
         rospy.loginfo("{}. Has exceeded expected time limit: {} [s]".format(self.action_str, self.max_expected_action_time_s))
         
-        if self.action_str == "takeoff":
+        if self.action_str == "takeoff" and self.drone_state not in ["FS_MOTOR_RAMPING", "FS_TAKINGOFF"]:
           # Retry takeoff
           rospy.loginfo("Retrying takeoff")
           self._takeoff()
         
-        if self.action_str == "land":
+        elif self.action_str == "land" and self.drone_state not in ["FS_LANDING"]:
           # Retry landing
           rospy.loginfo("Retrying landing")
-          self.__land()  
-        # elif self.action_str == "land" and self.drone_state in ["FS_FLYING", "FS_HOVERING"]:
-        #   # Try to track helipad
-        #   self.action_str = "track"
-        #   self.__track()
+          self._land()  
 
-        if self.action_str == "move_relative" and self.drone_state == "FS_FLYING":
-          # Might be stuck in the state "FS_FLYING" if only controlling the altitude (on the sim, atleast)
-          rospy.loginfo("Trying to hover")
-          self.action_movement = np.zeros((4, 1))
-          self._move_relative()
+        elif self.action_str == "move_relative" and self.drone_state == "FS_FLYING":
+          # Might be stuck in the state "FS_FLYING" by some reason
+          self._hover()
+
+        start_time = rospy.Time.now() 
+
+      elif self.is_ordered_to_cancel_current_action:
+        # May want to have some logic for cancelling actions
 
         # Must determine a method for cancelling actions'
         # Only a small subset of actions are possible to cancel, and 
@@ -621,11 +650,8 @@ class MissionExecutorNode():
         # self._cancel_action()
 
         # self._get_next_action_function()()
-        start_time = rospy.Time.now() # Currently just restart the timer to prevent being spammed with messages
-        # action_finished_counts = 0
-      
-      # else:
-      #   rospy.loginfo("Drone performing action: {}. Count achieved: {}".format(self.action_str, action_finished_counts))
+        # start_time = rospy.Time.now()
+        pass 
 
       self.rate.sleep()
 
