@@ -48,17 +48,19 @@ class GenerateAttitudeCommands():
   def generate_attitude_commands(self) -> None:
     test_angle_rad = np.deg2rad(10)
 
-    roll = [0] * 4
-    pitch = [0] * 4
+    roll = [0] * 7
+    pitch = [0] * 7
     if self.estimate_models:
       if self.estimate_roll_models:
         rospy.loginfo("Generating commands for roll")
-        roll = [0, test_angle_rad, 0, -test_angle_rad]
+        roll = [0, test_angle_rad, 0, 0, -test_angle_rad, 0, 0]
       else:
         rospy.loginfo("Generating commands for pitch")
-        pitch = [0, test_angle_rad, 0, -test_angle_rad]
+        pitch = [0, test_angle_rad, 0, 0, -test_angle_rad, 0, 0]
 
     wait_time = self.time_to_stabilize
+
+    heave_velocities = [0, 0, 0.1, 0, -0.1, 0, 0]
 
     i = 0
     attitude_reference = np.zeros((2, 1))
