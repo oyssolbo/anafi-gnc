@@ -4,8 +4,8 @@
     <rosparam command="load" file="$(find anafi_setup)/config/anafi_config.yaml"/>
 
     <node
-        name="dnn_cv"
-        pkg="dnncv"
+        name="old_dnn_cv"
+        pkg="old_dnncv"
         type="dnncv.py">
         <param name="config_file" value="dnncv_config.yaml" />
     </node>

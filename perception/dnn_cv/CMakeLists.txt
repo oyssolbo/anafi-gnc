@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(dnncv)
+project(old_dnncv)
 
 
 ## Find catkin macros and libraries
