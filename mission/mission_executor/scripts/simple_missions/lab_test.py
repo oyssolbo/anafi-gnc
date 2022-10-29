@@ -4,9 +4,10 @@ import numpy as np
 
 class Actions:
   def __init__(self) -> None:
-    self.action_str = ""
-    self.action_frame = "ned"
+    self.action_str : str = ""
+    self.action_frame : str = "ned"
     self.action_movement : np.ndarray = np.zeros((4, 1))
+    self.action_time : float = -1
   
   def get_action_str(self) -> str:
     return self.action_str
@@ -16,6 +17,9 @@ class Actions:
 
   def get_action_frame(self) -> str:
     return self.action_frame
+
+  def get_action_time(self) -> float:
+    return self.action_time
 
 class TakeoffAction(Actions):
   def __init__(self, altitude : float) -> None:
@@ -49,16 +53,25 @@ class TravelToAction(Actions):
   # Fitted to travelling with respect to another frame
   pass 
 
+class HoverAction(Actions):
+  def __init__(self, hover_time : float) -> None:
+    super().__init__()
+
+    self.action_str = "hover"
+    self.action_time = hover_time
+
 
 def generate_actions(mission_id : int) -> list:#(Actions):
   action_list = []
 
   if mission_id == -3:
     action_list.append(TakeoffAction(altitude=2))
+    action_list.append(HoverAction(15))
     action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
     action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
     action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
-    action_list.append(TrackAction())
+    # action_list.append(TrackAction())
+    action_list.append(LandAction())
 
   elif mission_id == -2:
     action_list.append(TakeoffAction(altitude=2))
