@@ -92,6 +92,11 @@ class PIDReferenceGenerator(GenericAttitudeReferenceGenerator):
     pitch_reference = self.clamp(pitch_reference[0], self.pitch_limits)
     roll_reference = self.clamp(roll_reference[0], self.roll_limits)
 
+    if np.abs(pitch_reference) < 1e-5:
+      pitch_reference = 0
+    if np.abs(roll_reference) < 1e-5:
+      roll_reference = 0
+
     attitude_reference = np.array([roll_reference, pitch_reference], dtype=float)
 
     if debug:

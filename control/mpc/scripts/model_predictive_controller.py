@@ -135,6 +135,21 @@ class ModelPredictiveController():
       ]
     )
 
+  def _prevent_underflow(
+        self, 
+        arr       : np.ndarray, 
+        min_value : float       = 1e-6
+      ) -> np.ndarray:
+    """
+    Preventing underflow to setting all values with an absolute value below
+    @p min_value to 0. It assumes that 
+    """
+    with np.nditer(arr, op_flags=['readwrite']) as iterator:
+      for val in iterator:
+        if np.abs(val) < min_value:
+          val[...] = 0
+    return arr
+
 
   def spin(self) -> None:
     x = np.zeros((9, 1))
@@ -143,6 +158,7 @@ class ModelPredictiveController():
       if self.is_controller_active:
         x = self._get_current_state_estimate()
         u = self.MPC_solver.make_step(x)
+        u = self._prevent_underflow(arr=u, min_value=1e-6)
 
         attitude_cmd_msg = AttitudeCommand()
         attitude_cmd_msg.header.stamp = rospy.Time.now()

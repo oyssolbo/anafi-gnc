@@ -11,6 +11,7 @@ find_package(catkin REQUIRED
   geometry_msgs
   message_generation
   anafi_uav_msgs
+  old_utilities
 )
 
 ## Specify additional locations of header files

@@ -5,6 +5,9 @@ attitude_limits:
   pitch: [-5, 5]  # deg
   roll: [-5, 5]   # deg
 
+use_optical_flow_velocities: false  # true -> Using velocity estimates from optical_flow
+                                    # false -> Using polled velocity estimates 
+
 mpc_config:
   system_parameters:
     drone:
@@ -14,13 +17,13 @@ mpc_config:
         y: 0.09929089
         z: 0          # Not estimated
 
-      attitude_control_parameters:  # These must be estimated
+      attitude_control_parameters:  
         time_constants:
-          roll:   0.01
-          pitch:  0.01
+          roll:   0.32034106
+          pitch:  0.15869484
         input_gains:
-          roll:   1
-          pitch:  1
+          roll:   1.02539815
+          pitch:  0.95176013
 
     gravitational_acceleration: 9.82179 # [m/s²] - for Trondheim at sea level
     
@@ -30,7 +33,7 @@ mpc_config:
     m: 1
 
     objective_function:
-      q_diagonal: [2, 2, 1.5, 2.5, 2.5, 1, 0.75, 0.75, 0.001]
+      q_diagonal: [2, 2, 1.5, 1.25, 1.25, 1, 0.5, 0.5, 0.001]
       r_diagonal: [1, 1, 0, 1]
     
     # slack_constraints: [0, 0, 0] 
@@ -51,6 +54,6 @@ mpc_config:
   solving_parameters:
     collocation_degree: 2
     solver_options:
-      solver: "mumps" # MA57 recommended, https://www.hsl.rl.ac.uk/ipopt/
+      solver: "MA57"  # MA57 is recommended, https://www.hsl.rl.ac.uk/ipopt/
                       # but struggled to get it installed
       debug_level: 0

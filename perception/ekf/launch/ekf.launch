@@ -4,8 +4,8 @@
     <rosparam command="load" file="$(find anafi_setup)/config/anafi_config.yaml"/>
 
     <node
-        name="perception_ekf"
-        pkg="perception_ekf"
+        name="old_perception_ekf"
+        pkg="old_perception_ekf"
         type="run_ekf.py"
         output="screen">
         <param name="config_file" value="ekf_config.yaml" />
