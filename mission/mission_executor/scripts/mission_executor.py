@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 
+from turtle import pos
 import rospy
 import rospkg
 
-import pyproj
+import pymap3d
 import numpy as np
 
 from collections import deque
@@ -14,14 +15,11 @@ from anafi_uav_msgs.srv import SetPlannedActions, SetPlannedActionsRequest, SetP
 import olympe_bridge.msg 
 
 import std_msgs.msg
-import sensor_msgs.msg
+import geometry_msgs.msg
 from std_srvs.srv import SetBool
 
 import mission_executor_helpers.utilities as utilities
 import simple_missions.lab_test as lab_test
-
-import warnings
-warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 class MissionExecutorNode():
   """
@@ -39,9 +37,8 @@ class MissionExecutorNode():
     self.rate = rospy.Rate(node_rate)
 
     # Setup subscribers
-    # rospy.Subscriber("/drone/out/telemetry", anafi_uav_msgs.msg.AnafiTelemetry, self._drone_telemetry_cb)
     rospy.Subscriber("/anafi/state", std_msgs.msg.String, self._drone_state_cb) 
-    rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self._drone_gnss_cb)
+    rospy.Subscriber("/anafi/ned_pose_from_gnss", geometry_msgs.msg.PointStamped, self._drone_ned_pose_from_gnss_cb)
     rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self._ekf_cb)
 
     # Setup services
@@ -51,17 +48,20 @@ class MissionExecutorNode():
     self.takeoff_pub = rospy.Publisher("/anafi/cmd_takeoff", std_msgs.msg.Empty, queue_size=1)
     self.land_pub = rospy.Publisher("/anafi/cmd_land", std_msgs.msg.Empty, queue_size=1)
 
-    self.move_to_ecef_pub = rospy.Publisher("/anafi/cmd_moveto", olympe_bridge.msg.MoveToCommand, queue_size=1)
+    self.move_to_pub = rospy.Publisher("/anafi/cmd_moveto", olympe_bridge.msg.MoveToCommand, queue_size=1)
+    self.move_to_ned_pos_pub = rospy.Publisher("/anafi/cmd_moveto_ned_position", geometry_msgs.msg.PointStamped, queue_size=1)
     self.move_relative_pub = rospy.Publisher("/anafi/cmd_moveby", olympe_bridge.msg.MoveByCommand, queue_size=1)
 
     # Services and actions to connect to
     self.velocity_controller_service_name = "/velocity_controller/service/enable_controller"
 
     # Initializing values
-    self.pos_ecef : np.ndarray = None 
-    self.ned_origin_in_ECEF : np.ndarray = None       # The origin of the NED-frame expressed in ECEF
+    self.pos_ned_gnss : np.ndarray = None 
+    self.expected_platform_ned_pos : np.ndarray = None       
     self.pos_relative_to_helipad : np.ndarray = None
-    self.desired_ecef_coordinates : np.ndarray = None 
+    self.desired_ned_pos : np.ndarray = None 
+    self.search_points_ned : np.ndarray = np.zeros((0,0))
+    print(self.search_points_ned)
 
     self.is_action_list_updated : bool = False
     self.action_str_list : list[str] = []
@@ -103,32 +103,18 @@ class MissionExecutorNode():
     self.new_state_update = True
 
 
-  def _drone_gnss_cb(
+  def _drone_ned_pose_from_gnss_cb(
         self, 
-        msg : sensor_msgs.msg.NavSatFix
+        msg : geometry_msgs.msg.PointStamped
       ) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.gnss_timestamp, msg_timestamp):
       # Old message
       return
-
-    gnss_status = msg.status
-    if gnss_status == -1:
-      # No position fix
-      return 
-
-    latitude_deg = msg.latitude
-    longitude_deg = msg.longitude 
-    altitude_m = msg.altitude 
-
-    # Convertion from long / lat / altitude to ECEF
-    ecef = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
-    lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
-    x, y, z = pyproj.transform(lla, ecef, longitude_deg, latitude_deg, altitude_m, radians=False)
     
     self.gnss_timestamp = msg_timestamp
-    self.pos_ecef = np.array([x, y, z]).T
+    self.pos_ned_gnss = np.array([msg.point.x, msg.point.y, msg.point.z], dtype=float).reshape((3, 1)) 
 
 
   def _ekf_cb(
@@ -234,6 +220,10 @@ class MissionExecutorNode():
     return rospy.ServiceProxy(service_name, service_type)
 
 
+  def _initialize(self) -> bool:
+    return True
+
+
   def _idle(self):
     rospy.loginfo("Idling")
 
@@ -303,10 +293,84 @@ class MissionExecutorNode():
       rospy.logerr("[_track()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
     
   
-  def _search(self) -> None:
-    rospy.loginfo("Trying to search an area")
-    # Must use some trajectory planning to generate paths or trajectories for
-    # the search in the desired area
+  def _return_to_expected_home(self) -> None:
+    if self.expected_platform_ned_pos is None:
+      # No GNSS measurements
+      # Assume that the platform error is sufficiently small, such that 
+      # a search will detect it
+      estimated_platform_ned_pos = np.zeros((3, 1))
+    else:
+      estimated_platform_ned_pos = self.expected_platform_ned_pos
+    self._travel_to_ned_position(estimated_platform_ned_pos)
+
+
+  def _initialize_search(self, target_str : str = "helipad") -> None:
+    rospy.loginfo("Trying to search an area for target {}".format(target_str))
+
+    if not self.search_points_ned.size:
+      warn_message_str = "Previous points are marked to be searched. This includes:\n"
+      for col in self.search_points_ned.shape[1]:
+        warn_message_str += str(self.search_points_ned[0, col]) + "," + str(self.search_points_ned[1, col]) + "\n"
+      warn_message_str += "\nThese positions will be deleted as the search-initialization is currently implemented!"
+      rospy.logwarn(warn_message_str)
+
+    search_side_length = 0.5 # [m]
+    search_altitude = -2.0 # NOTE: I have no clue on the optimal altitude for searching... Discuss this with Simen
+    initial_pos = self.pos_ned_gnss
+
+    num_sides = 12
+    
+    search_points_ned : np.ndarray = np.zeros((3, num_sides))
+    self.search_target : str = target_str
+
+    search_points_ned[0,:] = initial_pos # This is gonna be fun to debug
+
+    length_multiplier = 1.0
+    for side_idx in range(1, num_sides):
+      current_x_pos = search_points_ned[0, side_idx - 1]
+      current_y_pos = search_points_ned[1, side_idx - 1] 
+ 
+      if side_idx % 2 == 1:
+        next_x = current_x_pos + length_multiplier * search_side_length
+        next_y = 0
+      else:
+        next_x = 0
+        next_y = current_y_pos + length_multiplier * search_side_length
+
+        # Multiplication to achieve the expanding square search
+        length_multiplier *= -2.0
+
+      next_pos = [current_x_pos + next_x, current_y_pos + next_y, search_altitude]
+      search_points_ned[side_idx,:] = np.array(next_pos, dtype=np.float).ravel()
+
+    self.search_points_ned = search_points_ned
+      
+     
+
+  def _search(self, target_str : str = "helipad") -> bool:
+    """
+    This is just a very simple expanding squares search. See IAMSAR manual: Vol. 2: Mission co-ordination
+    for more details
+    """
+    if not self.search_points_ned.size:
+      rospy.loginfo("No positions to search")
+      return True
+    
+    target_pos = self.search_points_ned[:,0]
+    if np.linalg.norm(target_pos - self.pos_ned_gnss) <= 0.2:
+      # Close enough - travel to the next point of interest
+      mask = np.ones(len(self.search_points_ned), dtype=bool)
+      mask[[0]] = False
+      result = self.search_points_ned[mask,...] # This is going to be fun to debug...
+      print(result)
+      if not result.size:
+        rospy.loginfo("All areas searched...")
+        return True
+        
+      target_pos = result[:,0]
+
+    rospy.loginfo("Trying to search an area for target {} at x = {} and y = {}".format(target_str))
+    return False
   
   
   def _communicate(self) -> None:
@@ -314,47 +378,38 @@ class MissionExecutorNode():
     rospy.loginfo("Communicating")
   
 
-  def _travel_to(self) -> None:
-    rospy.logwarn("Travelling to will maintain the pose, as there are uncertainties regarding the ECEF-pose")
-    desired_ecef_coordinates = self.pos_ecef 
+  def _travel_to_ned_position(self, position_ned : np.ndarray) -> None:
+    """
+    Using the internal controllers as they are more optimized. 
+    If the drone is too quick, it might be possible to enable the internal controllers.
+    """
 
-    # TODO: Must find a method for loading in the desired positions in NED or ECEF
-    # desired_location = None 
-    # ned_coordinates = self._load_locations_positions_ned(location=desired_location)
+    if self.pos_ned_gnss is None:
+      rospy.logerr("Global position estimate is currently not received. Will maintain pose")
+      return
+
+    desired_altitude = position_ned[2]
+    if desired_altitude > -2.0: # This might be scary if operating over water, due to high ambiguity in vertical positioning  
+      rospy.logerr("Desired position given with an altitude of {} m. Will move in x={} and y={} but keep an altitude of 5 m".format(
+          position_ned[2],
+          position_ned[0],
+          position_ned[1]
+        )
+      )
+      # desired_altitude = -5 # NOTE: This might cause a reference-bug if the position_ned variable is used somewhere else, because python
+                            # NOTE: This can be really dangerous if flying inside the drone-lab! Must be run outside or in the sim
+      desired_altitude = -2
     
-    # if self.ned_origin_in_ECEF is None:
-    #   rospy.logerr("No ECEF-coordinates are available for NED's origin")
-    #   return 
+    ned_point = geometry_msgs.msg.Point()
+    ned_point.x = position_ned[0]
+    ned_point.y = position_ned[1]
+    ned_point.z = desired_altitude
 
-    # desired_ecef_coordinates = ned_coordinates + self.ned_origin_in_ECEF
-    # desired_ecef_coordinates = self.pos_ecef 
+    ned_point_msg = geometry_msgs.msg.PointStamped()
+    ned_point_msg.header.stamp = rospy.Time.now()
+    ned_point_msg.point = ned_point
 
-    # TODO: Should have some checks to prevent the drone from crashing into the water etc
-    # Find a method for checking that ned_z > -1.0 or something, where -1.0 means that 
-    # the drone is above the ground
-
-    # The maximum speed could be made relative to the distance the system must travel
-
-    ecef = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
-    lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
-    lon, lat, alt = pyproj.transform(
-      ecef, 
-      lla, 
-      desired_ecef_coordinates[0], 
-      desired_ecef_coordinates[1], 
-      desired_ecef_coordinates[2], 
-      radians=False
-    )
-
-    move_to_ecef_cmd = olympe_bridge.msg.MoveToCommand()
-    move_to_ecef_cmd.header.stamp = rospy.Time.now()
-    move_to_ecef_cmd.latitude = lat
-    move_to_ecef_cmd.longitude = lon 
-    move_to_ecef_cmd.altitude = alt
-    move_to_ecef_cmd.heading = 0          # Desired heading towards north
-    move_to_ecef_cmd.orientation_mode = 2 # The drone will start to orient itself towards the target before moving
-
-    self.move_to_ecef_pub.publish(move_to_ecef_cmd)
+    self.move_to_ned_pos_pub.publish(ned_point_msg)
 
 
   def _move_relative(self) -> None:
@@ -406,7 +461,6 @@ class MissionExecutorNode():
     return (is_desired_state_reached, duration >= max_wait_time, current_count)
 
     
-
   def _load_locations_positions_ned(self, location : str) -> np.ndarray:
     # Load the locations to travel to
     # These should be loaded in either the ECEF-frame or NED-frame
@@ -433,7 +487,7 @@ class MissionExecutorNode():
     """
 
     if self.drone_state is None:
-      rospy.logerr("Drone state not set!")
+      rospy.logerr_throttle(5, "Drone state not set! Check connection to the bridge, and that data is published on topic '/anafi/state'")
       return (False, False, 0)
 
 
@@ -469,7 +523,7 @@ class MissionExecutorNode():
       vertical_pos_error = self.pos_relative_to_helipad[2]
       
       horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.05)
-      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.9)
+      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.9) # NOTE: 0.9 for the simulator. Get this from launch-file or something
 
       # Check whether the drone is close enough to the helipad
       is_drone_close_to_helipad = (
@@ -480,7 +534,9 @@ class MissionExecutorNode():
 
       # Check whether the horizontal velocity is low enough, such that it does not try
       # to land if it suddenly gets high velocities in one direction
-      is_velocity_low_enough = True
+      # One might consider using the attitude, but that might cause problems if the drone 
+      # must counteract disturbances from e.g. wind 
+      is_velocity_low_enough = True # TODO
 
       is_drone_ready_to_land = (is_drone_close_to_helipad and is_velocity_low_enough)
 
@@ -492,8 +548,9 @@ class MissionExecutorNode():
       return (is_drone_ready_to_land and current_count >= 3, False, current_count) 
 
 
-    # The different actions are set as True, since these are not implemented
     if self.action_str == "search":
+      # Must get an update from the perception-module whether the object of interest has been detected
+
       return (True, False, 0)
 
 
@@ -510,11 +567,11 @@ class MissionExecutorNode():
       horizontal_radius_of_acceptance = rospy.get_param("~horizontal_radius_of_acceptance", default=1.0)
       vertical_radius_of_acceptance = rospy.get_param("~vertical_radius_of_acceptance", default=2.0)
       
-      if self.desired_ecef_coordinates is None:
+      if self.desired_ned_pos is None:
         rospy.logerr("[_check_current_action_finished()] Desired ECEF coordinates are None")
         return (False, False, 0)
 
-      pos_error_ecef = self.desired_ecef_coordinates - self.pos_ecef
+      pos_error_ecef = self.desired_ned_pos - self.pos_ned_gnss
       return np.linalg.norm(pos_error_ecef[:2]) <= horizontal_radius_of_acceptance \
               and np.abs(pos_error_ecef) <= vertical_radius_of_acceptance
 
@@ -546,8 +603,8 @@ class MissionExecutorNode():
         min_count=5,
         max_wait_time=self.max_expected_action_time_s
       )
-      # if not drone_state[0]:
-      #   self._hover()
+      if not drone_state[0]:
+        self._hover()
       return (((rospy.Time.now() - start_time).to_sec() >= self.action_desired_time) and drone_state[0], False, drone_state[2])
 
 
@@ -588,17 +645,25 @@ class MissionExecutorNode():
     start_time = rospy.Time.now()
 
     relative_movement_ordered : np.ndarray = np.zeros((3, 1))
-    gnss_position_initialized : bool = False
+    ned_position_initialized : bool = False
     action_finished_counts = 0
     
     while not rospy.is_shutdown():
-      if not gnss_position_initialized:
+      if not ned_position_initialized:
         # Check if the position has been updated
-        if self.pos_ecef is not None:
-          # This is only intendended as a rough estimate for longer missions
-          # or missions where the EKF estimate will drift
-          self.ned_origin_in_ECEF = self.pos_ecef - relative_movement_ordered # TODO: Check that this becomes accurate enough
-          gnss_position_initialized = True
+        if self.pos_ned_gnss is not None:
+          # This is only intendended as a rough estimate for missions where the 
+          # GNSS-estimate is not received immediately at startup
+          self.expected_platform_ned_pos = self.pos_ned_gnss - relative_movement_ordered # TODO: Check that this becomes accurate enough
+          ned_position_initialized = True
+
+          ned_origin_info_str = "NED-frame is initialized with respect to the initial GNSS-message.\
+          \nPosition of helipad is expected to be at [{}, {}, {}] in the NED-frame.".format(
+            self.expected_platform_ned_pos[0],
+            self.expected_platform_ned_pos[1],
+            self.expected_platform_ned_pos[2]
+            )
+          rospy.logwarn(ned_origin_info_str)
 
       check_finished = self._check_current_action_finished(
         start_time=start_time,
