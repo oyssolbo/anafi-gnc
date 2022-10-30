@@ -6,7 +6,7 @@ class Actions:
   def __init__(self) -> None:
     self.action_str : str = ""
     self.action_frame : str = "ned"
-    self.action_movement : np.ndarray = np.zeros((4, 1))
+    self.action_movement : np.ndarray = np.zeros((4, 1)) # [x, y, z, psi]
     self.action_time : float = -1
   
   def get_action_str(self) -> str:
@@ -71,7 +71,7 @@ def generate_actions(mission_id : int) -> list:#(Actions):
     action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
     action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
     # action_list.append(TrackAction())
-    action_list.append(LandAction())
+    # action_list.append(LandAction())
 
   elif mission_id == -2:
     action_list.append(TakeoffAction(altitude=2))
