@@ -353,11 +353,6 @@ class MissionExecutorNode():
       search_points_ned[:, side_idx] = np.array(next_pos, dtype=np.float).reshape((3, 1)).ravel()
 
     self.search_points_ned = search_points_ned
-
-    # position_str = "Positions in NED to be searched:\n"
-    # for col in range(self.search_points_ned.shape[1]):
-    #   position_str += str(self.search_points_ned[0, col]) + "," + str(self.search_points_ned[1, col]) + "," + str(self.search_points_ned[2, col]) + "\n"
-    # rospy.loginfo(position_str)
      
 
   def _search_positions(self) -> bool:
