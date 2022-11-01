@@ -1,4 +1,8 @@
 <launch>
+
+	<arg name="use_ned_pos_from_gnss" default="false" /> 
+	<param name="use_ned_pos_from_gnss" type="bool" value="$(arg use_ned_pos_from_gnss)" />
+
   <node
     name="mpc"
     pkg="mpc"
