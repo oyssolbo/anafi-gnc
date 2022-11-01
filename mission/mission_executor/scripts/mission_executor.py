@@ -54,7 +54,11 @@ class MissionExecutorNode():
     self.move_relative_pub = rospy.Publisher("/anafi/cmd_moveby", olympe_bridge.msg.MoveByCommand, queue_size=1)
 
     # Services and actions to connect to
-    self.velocity_controller_service_name = "/velocity_controller/service/enable_controller"
+    selected_control_method = rospy.get_param("/control_method")
+    if selected_control_method == "mpc":
+      self.controller_service_name = "/mpc/service/enable_controller"
+    else:
+      self.controller_service_name = "/velocity_controller/service/enable_controller"
 
     # Initializing values
     self.pos_ned_gnss : np.ndarray = None 
@@ -235,21 +239,21 @@ class MissionExecutorNode():
     try:
       service_timeout = 2.0
       
-      # Disable the velocity controller to have a predefined state
+      # Disable the controller to have a predefined state
       service_response = self._get_service_interface(
         service_type=SetBool,
-        service_name=self.velocity_controller_service_name,
+        service_name=self.controller_service_name,
         timeout=service_timeout 
       )(False)
       if not service_response.success:
-        rospy.logerr("[_takeoff()] Cannot disable velocity-controller")
+        rospy.logerr("[_takeoff()] Cannot disable controller")
         raise ValueError()
 
       # Taking off
       self.takeoff_pub.publish(std_msgs.msg.Empty()) 
 
     except Exception as e:
-      rospy.logerr("[_takeoff()] {} unavailable. Error {}".format(self.velocity_controller_service_name, e))
+      rospy.logerr("[_takeoff()] {} unavailable. Error {}".format(self.controller_service_name, e))
 
 
   def _land(self):
@@ -258,21 +262,21 @@ class MissionExecutorNode():
     try:
       service_timeout = 0.5 # Short timeout might be problem due to power drain when running the perception nodes...
       
-      # Disable the velocity controller
+      # Disable the controller
       service_response = self._get_service_interface(
         service_type=SetBool,
-        service_name=self.velocity_controller_service_name, 
+        service_name=self.controller_service_name, 
         timeout=service_timeout 
       )(False)
       if not service_response.success:
-        rospy.logerr("[_land()] Cannot disable velocity-controller")
+        rospy.logerr("[_land()] Cannot disable controller")
         raise ValueError()
 
       # Land
       self.land_pub.publish(std_msgs.msg.Empty())
 
     except Exception as e:
-      rospy.logerr("[_land()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
+      rospy.logerr("[_land()] {} unavailable. Error: {}".format(self.controller_service_name, e))
 
 
   def _track(self) -> None:
@@ -281,17 +285,17 @@ class MissionExecutorNode():
     try:
       service_timeout = 2.0 
       
-      # Enable the velocity controller
+      # Enable the controller
       service_response = self._get_service_interface(
         service_type=SetBool,
-        service_name=self.velocity_controller_service_name, 
+        service_name=self.controller_service_name, 
         timeout=service_timeout 
       )(True)
       if not service_response.success:
-        raise ValueError("[_track()] Cannot enable velocity-controller")
+        raise ValueError("[_track()] Cannot enable controller")
 
     except Exception as e:
-      rospy.logerr("[_track()] {} unavailable. Error: {}".format(self.velocity_controller_service_name, e))
+      rospy.logerr("[_track()] {} unavailable. Error: {}".format(self.controller_service_name, e))
     
   
   def _return_to_expected_home(self) -> None:
@@ -680,9 +684,6 @@ class MissionExecutorNode():
     with the new actions? Could be some mediation between the planner and the 
     executor 
     """
-
-    rospy.loginfo("Initializing")
-
     self._get_action_data()
     self._get_next_action_function()()
     start_time = rospy.Time.now()
@@ -762,39 +763,6 @@ class MissionExecutorNode():
         pass 
 
       self.rate.sleep()
-
-
-  def test_functions(self) -> None:
-    def _test_initialize_search() -> bool:
-      self._initialize_search("helipad")
-      print(self.search_points_ned)
-      return self.search_points_ned.shape == (3, 12) 
-
-    def _test_search_empty() -> bool:
-      self.search_points_ned = np.empty((0,0))
-      return self._search_positions(is_testing=True)
-
-    def _test_search_first_elem_in_list() -> bool:
-      return self._search_positions(is_testing=True)
-
-
-    def _test_search_all_elem_in_list() -> bool:
-      self._initialize_search()
-      try:
-        i = 0
-        while self.search_points_ned.size and i < 69: # i just used to guarantee concergence
-          self._search_positions(is_testing=True)
-          i += 1
-        return self.search_points_ned.size == 0
-      except Exception as e:
-        print("Exception occured", e)
-        return False
-
-    assert _test_search_empty(), "Searching failed for empty numpy array"
-    assert _test_initialize_search(), "Initialize searching failed"
-    # assert _test_search_first_elem_in_list(), "Searching failed for first element in full numpy array"
-    # assert _test_search_all_elem_in_list(), "Searching failed for entire list" 
-
 
 
 def main():
