@@ -3,7 +3,7 @@ node_rate: 10
 
 testing:
   is_mission_testing: true
-  mission_test_id: -3
+  mission_test_id: -4
 
 # Some of these values are quite large, but this if to 
 # offset the lag expected when running the DNN-CV

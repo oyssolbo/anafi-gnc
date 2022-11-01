@@ -60,9 +60,21 @@ class HoverAction(Actions):
     self.action_str = "hover"
     self.action_time = hover_time
 
+class SearchAction(Actions):
+  def __init__(self) -> None:
+    super().__init__()
+
+    self.action_str = "search"
+
 
 def generate_actions(mission_id : int) -> list:#(Actions):
   action_list = []
+
+  if mission_id == -4:
+    action_list.append(TakeoffAction(altitude=2))
+    action_list.append(HoverAction(5))
+    action_list.append(SearchAction())
+
 
   if mission_id == -3:
     action_list.append(TakeoffAction(altitude=2))
