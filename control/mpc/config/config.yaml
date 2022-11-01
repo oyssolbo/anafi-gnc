@@ -28,7 +28,7 @@ mpc_config:
     gravitational_acceleration: 9.82179 # [m/s²] - for Trondheim at sea level
     
   tuning_parameters:
-    nx: 9
+    nx: 9 # 10 - could add integral action for x,y,z and drop the state estimates for heave and yaw 
     nu: 4
     m: 1
 
@@ -49,11 +49,10 @@ mpc_config:
     
     prediction_horizon: 10
     robust_horizon: 0
-    time_step: 0.2          # [s] 
+    time_step: 0.02          # [s] 
 
   solving_parameters:
     collocation_degree: 2
     solver_options:
       solver: "MA57"  # MA57 is recommended, https://www.hsl.rl.ac.uk/ipopt/
-                      # but struggled to get it installed
       debug_level: 0
