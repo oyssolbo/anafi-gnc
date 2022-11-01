@@ -3,25 +3,18 @@
 import rospy 
 import std_msgs.msg
 import sensor_msgs.msg
-import pyproj
-from enum import Enum
 
-from geometry_msgs.msg import TwistStamped
+from scipy.spatial.transform import Rotation
+
+from geometry_msgs.msg import TwistStamped, PointStamped, QuaternionStamped
 
 from anafi_uav_msgs.msg import PointWithCovarianceStamped
-from anafi_uav_msgs.srv import SetDesiredPose, SetDesiredPoseRequest, SetDesiredPoseResponse
+from anafi_uav_msgs.srv import SetDesiredPosition, SetDesiredPositionRequest, SetDesiredPositionResponse
 
 import numpy as np
 import guidance_helpers.utilities as utilities
 
-import warnings
-warnings.filterwarnings('ignore', category=DeprecationWarning)
-
-class GuidanceState(Enum):
-  ECEF = 0
-  RELATIVE_TO_HELIPAD = 1
-  IDLE = 2
-
+np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
 
 class PurePursuitGuidanceLaw():
   """
@@ -36,25 +29,13 @@ class PurePursuitGuidanceLaw():
     rospy.init_node(node_name)
     self.rate = rospy.Rate(controller_rate)
 
-    # Set up subscribers 
-    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
-    rospy.Subscriber("/anafi/gnss_location", sensor_msgs.msg.NavSatFix, self._drone_gnss_cb)
-    # rospy.Subscriber("/platform/out/gps", sensor_msgs.msg.NavSatFix, self._target_gnss_cb) # Could be nice to subscribe to the estimated GNSS data about the target
-    # rospy.Subscriber("/estimate/target_velocity", anafi_uav_msgs.msg.) # Would be nice to predict target movement
-
-    # Set up publishers
-    self.reference_velocity_publisher = rospy.Publisher("/guidance/pure_pursuit/velocity_reference", TwistStamped, queue_size=1)
-
-    # Set up services
-    rospy.Service("/guidance/service/desired_pos", SetDesiredPose, self._set_desired_ecef_pos)
-
     # Initialize parameters
     pure_pursuit_params = rospy.get_param("~pure_pursuit_parameters")
     velocity_limits = rospy.get_param("~velocity_limits")
     
     self.ua_max = pure_pursuit_params["ua_max"]
     self.lookahead = pure_pursuit_params["lookahead"]
-    # self.kappa = pure_pursuit_params["kappa"]
+    self.fixed_kappa = pure_pursuit_params["kappa"]
 
     self.vx_limits = velocity_limits["vx"]
     self.vy_limits = velocity_limits["vy"]
@@ -62,59 +43,78 @@ class PurePursuitGuidanceLaw():
 
     self.desired_altitude : float = -1.0
 
-    self.ekf_timestamp : std_msgs.msg.Time = None
-    self.gnss_timestamp : std_msgs.msg.Time = None
+    self.position_timestamp : std_msgs.msg.Time = None
 
-    self.desired_ecef_pos : np.ndarray = None  # [xd, yd, zd]
-    self.ecef_pos : np.ndarray = None          # [x, y, z]
+    self.desired_position : np.ndarray = None  # [xd, yd, zd]
+    self.position : np.ndarray = None 
 
-    self.pos_relative_to_helipad : np.ndarray = None 
+    self.last_rotation_matrix_body_to_vehicle : np.ndarray = None
 
-    self.guidance_state : GuidanceState = GuidanceState.RELATIVE_TO_HELIPAD
+    # Set up subscribers 
+    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
 
+    self.use_ned_pos_from_gnss : bool = rospy.get_param("/use_ned_pos_from_gnss")
+    if self.use_ned_pos_from_gnss:
+      rospy.loginfo("Node using position estimates from GNSS. Estimates from EKF disabled")
+      rospy.Subscriber("/anafi/ned_pos_from_gnss", PointStamped, self._ned_pos_cb)
+      rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
+    else:
+      rospy.loginfo("Node using position estimates from EKF. Position estimates from GNSS disabled")
+      rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
 
-  def _set_desired_ecef_pos(self, msg : SetDesiredPoseRequest) -> SetDesiredPoseResponse:
-    self.desired_ecef_pos = np.array([msg.x_d, msg.y_d, msg.z_d]).T
+    # Set up publishers
+    self.reference_velocity_publisher = rospy.Publisher("/guidance/pure_pursuit/velocity_reference", TwistStamped, queue_size=1)
 
-    res = SetDesiredPoseResponse()
-    res.success = True
-    return res
-
-
-  def _drone_gnss_cb(self, msg : sensor_msgs.msg.NavSatFix) -> None:
-    msg_timestamp = msg.header.stamp
-
-    if not utilities.is_new_msg_timestamp(self.gnss_timestamp, msg_timestamp):
-      # Old message
-      return
-
-    gnss_status = msg.status.status
-    if gnss_status == -1:
-      # No position fix
-      return 
-
-    latitude_rad = msg.latitude * np.pi / 180.0
-    longitude_rad = msg.longitude * np.pi / 180.0
-    altitude_m = msg.altitude 
-
-    # Convertion from long / lat / altitude to ECEF
-    ecef = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
-    lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
-    x, y, z = pyproj.transform(lla, ecef, longitude_rad, latitude_rad, altitude_m, radians=True)
-    
-    self.gnss_timestamp = msg_timestamp
-    self.ecef_pos = np.array([x, y, z]).T
+    # Set up services
+    rospy.Service("/guidance/service/set_desired_position", SetDesiredPosition, self._set_desired_position_cb)
 
 
   def _ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
     msg_timestamp = msg.header.stamp
 
-    if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
+    if not utilities.is_new_msg_timestamp(self.position_timestamp, msg_timestamp):
       # Old message
       return
     
-    self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1))
+    self.position_timestamp = msg_timestamp
+    self.position = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
+
+
+  def _ned_pos_cb(self, msg : PointStamped) -> None:
+    msg_timestamp = msg.header.stamp
+
+    if not utilities.is_new_msg_timestamp(self.position_timestamp, msg_timestamp):
+      # Old message
+      return
+    
+    if self.last_rotation_matrix_body_to_vehicle is None:
+      # Impossible to convert positions to body frame
+      return
+    
+    # Positions must be transformed to body
+    self.position_timestamp = msg_timestamp
+    self.position = self.last_rotation_matrix_body_to_vehicle.T @ np.array([msg.point.x, msg.point.y, msg.point.z], dtype=float).reshape((3, 1)) 
+
+
+  def _attitude_cb(self, msg : QuaternionStamped) -> None:
+    msg_timestamp = msg.header.stamp
+
+    if not utilities.is_new_msg_timestamp(self.attitude_timestamp, msg_timestamp):
+      # Old message
+      return
+    
+    self.attitude_timestamp = msg_timestamp
+    rotation = Rotation.from_quat([msg.quaternion.x, msg.quaternion.y, msg.quaternion.z, msg.quaternion.w])
+    self.attitude_rpy = rotation.as_euler('xyz', degrees=False).reshape((3, 1))
+    self.last_rotation_matrix_body_to_vehicle = rotation.as_matrix()
+
+
+  def _set_desired_position_cb(self, position_req : SetDesiredPositionRequest) -> SetDesiredPositionResponse:
+    self.desired_position = np.array([position_req.x_d, position_req.y_d, position_req.z_d], dtype=np.float) 
+
+    res = SetDesiredPositionRequest()
+    res.success = True
+    return res 
 
 
   def _clamp(
@@ -125,35 +125,20 @@ class PurePursuitGuidanceLaw():
     return np.min([np.max([value, limits[0]]), limits[1]])
 
 
-  def _request_target_ecef_position(self):
-    pass
-
-
   def _get_valid_pos_error(self) -> np.ndarray:
     """
     Returns a valid error for position
     """
-    zeros = np.zeros((3, 1))
-    if self.guidance_state == GuidanceState.ECEF:
-      if (self.gnss_timestamp is None\
-        or self.ecef_pos is None\
-        or self.desired_ecef_pos is None
-      ):
-        return zeros
+    if (self.position_timestamp is None):
+      return np.zeros((3, 1))
 
-      return self.ecef_pos - self.desired_ecef_pos
-
-    if self.guidance_state == GuidanceState.RELATIVE_TO_HELIPAD:
-      if (self.ekf_timestamp is None):
-        return np.zeros((3, 1))
-
-      # Using a target-position above the helipad to guide safely
-      # target_position = np.array([0, 0, 0.25]).reshape((3, 1))
-      # error = -self.pos_relative_to_helipad #- target_position
-      altitude_error = (self.desired_altitude + self.pos_relative_to_helipad[2]) 
-      return np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error])
-
-    return zeros
+    # Using a target-position above the helipad to guide safely
+    # target_position = np.array([0, 0, 0.25]).reshape((3, 1))
+    # error = -self.position #- target_position
+    # altitude_error = (self.desired_altitude + self.position[2]) 
+    if np.linalg.norm(self.position[:2]) >= 0.2 and np.abs(self.position[2]) < 1.0:
+      altitude_error = 0
+    return np.array([self.position[0], self.position[1], altitude_error])
 
 
   def calculate_velocity_reference(self) -> None:
@@ -167,7 +152,7 @@ class PurePursuitGuidanceLaw():
     vel_target = zeros_3_1 # Possible extension to use constant bearing guidance in the future
 
     while not rospy.is_shutdown():
-      if self.pos_relative_to_helipad is None:
+      if self.position is None:
         self.rate.sleep()
         continue
 
@@ -197,20 +182,6 @@ class PurePursuitGuidanceLaw():
       twist_ref_msg.twist.linear.z = vel_ref_z
 
       self.reference_velocity_publisher.publish(twist_ref_msg)
-
-      # Should have some logic for switching to the ECEF-coordinate frame in case 
-      # the error becomes too large. Requires the guidance to have an overview of 
-      # the target position
-      # max_error = rospy.get_param("~max_error_normed", default=10)
-      # if self.guidance_state == GuidanceState.RELATIVE_TO_HELIPAD and pos_error_normed > max_error:
-      #   # May consider requesting ECEF-position of the target
-      #   # Idle, such that it will not move until the position is updated
-      #   # self.guidance_state = GuidanceState.IDLE
-      #   # self._request_target_ecef_position() # Set the state to ECEF
-      #   pass
-
-        # Might consider having the action-executor to perform this action
-
       self.rate.sleep()
 
 
