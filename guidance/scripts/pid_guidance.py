@@ -1,105 +1,124 @@
 #!/usr/bin/python3
 
 import rospy 
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import TwistStamped, PointStamped, QuaternionStamped
 
 from anafi_uav_msgs.msg import PointWithCovarianceStamped
 
 import numpy as np
 import guidance_helpers.utilities as utilities
 
-import warnings
-warnings.filterwarnings('ignore', category=DeprecationWarning)
+from scipy.spatial.transform import Rotation
 
+np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
 
 class PIDGuidanceLaw():
 
   def __init__(self):
 
-    # Directly from the config file Martin used
-    # pid:
-    #   x_axis:
-    #     kp: 0.5
-    #     ki: 0
-    #     kd: 0
-    #   y_axis:
-    #     kp: 0.5
-    #     ki: 0
-    #     kd: 0
-    #   z_axis:
-    #     kp: 0.2
-    #     ki: 0
-    #     kd: 0
+    rospy.init_node("pid_guidance_node")
+    self.rate = rospy.Rate(20) # Hardcoded from the pure-pursuit guidance
 
-    # velocity_limits:
-    #   vx: [-0.3, 0.3]
-    #   vy: [-0.3, 0.3]
-    #   vz: [-0.1, 0.1]
+    # Values are directly from the config file Martin used
+    self._Kp_x = 0.5  
+    self._Ki_x = 0    
+    self._Kd_x = 0    
 
-    self._Kp_x = 0.5  # params["x_axis"]["kp"]
-    self._Ki_x = 0    # params["x_axis"]["ki"]
-    self._Kd_x = 0    # params["x_axis"]["kd"]
+    self._Kp_y = 0.5  
+    self._Ki_y = 0    
+    self._Kd_y = 0    
 
-    self._Kp_y = 0.5  # params["y_axis"]["kp"]
-    self._Ki_y = 0    # params["y_axis"]["ki"]
-    self._Kd_y = 0    # params["y_axis"]["kd"]
+    self._Kp_z = 0.2  
+    self._Ki_z = 0    
+    self._Kd_z = 0    
 
-    self._Kp_z = 0.2  # params["z_axis"]["kp"]
-    self._Ki_z = 0    # params["z_axis"]["ki"]
-    self._Kd_z = 0    # params["z_axis"]["kd"]
-
-    self._vx_limits = (-0.3, 0.3) # limits["vx"]
-    self._vy_limits = (-0.3, 0.3) # limits["vy"]
-    self._vz_limits = (-0.1, 0.1) # limits["vz"]
-
-    print(10*"=", "Position controller control params", 10*"=")
-    print(f"X-axis: \tKp: {self._Kp_x} \tKi: {self._Ki_x} \tKd: {self._Kd_x} \tLimits: {self._vx_limits}")
-    print(f"Y-axis: \tKp: {self._Kp_y} \tKi: {self._Ki_y} \tKd: {self._Kd_y} \tLimits: {self._vy_limits}")
-    print(f"Z-axis: \tKp: {self._Kp_z} \tKi: {self._Ki_z} \tKd: {self._Kd_z} \tLimits: {self._vz_limits}")
-    print(56*"=")
+    self._vx_limits = (-0.3, 0.3) 
+    self._vy_limits = (-0.3, 0.3) 
+    self._vz_limits = (-0.1, 0.1) 
 
     self._prev_ts = None
     self._error_int = np.zeros(3)
     self._prev_error = np.zeros(3)
 
-    rospy.init_node("pid_guidance_node")
-    self.rate = rospy.Rate(20) # Hardcoded from the pure-pursuit guidance
+    self.position_timestamp : rospy.Time = None
+    self.last_rotation_matrix_body_to_vehicle : np.ndarray = None
 
-    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
+    # Initialize subscribers
+    self.use_ned_pos_from_gnss : bool = rospy.get_param("/use_ned_pos_from_gnss")
+    print(self.use_ned_pos_from_gnss)
+    if self.use_ned_pos_from_gnss:
+      rospy.loginfo("Node using position estimates from GNSS. Estimates from EKF disabled")
+      rospy.Subscriber("/anafi/ned_pos_from_gnss", PointStamped, self._ned_pos_cb)
+      rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
+    else:
+      rospy.loginfo("Node using position estimates from EKF. Position estimates from GNSS disabled")
+      rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
+
+    # Initialize publishers
     self.reference_velocity_publisher = rospy.Publisher("/guidance/pid/velocity_reference", TwistStamped, queue_size=1)
-
-    self.ekf_timestamp : rospy.Time = None
 
 
   def _clamp(self, value: float, limits: tuple):
     return np.min([np.max([value, limits[0]]), limits[1]])
 
 
-  def _ekf_cb(self, msg: PointWithCovarianceStamped) -> None:
+  def _ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
     msg_timestamp = msg.header.stamp
 
-    if not utilities.is_new_msg_timestamp(self.ekf_timestamp, msg_timestamp):
+    if not utilities.is_new_msg_timestamp(self.position_timestamp, msg_timestamp):
       # Old message
       return
     
-    self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = np.array([msg.position.x, msg.position.y, msg.position.z], dtype=np.float).T
+    self.position_timestamp = msg_timestamp
+    self.position = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=np.float).reshape((3, 1)) 
+
+
+  def _ned_pos_cb(self, msg : PointStamped) -> None:
+    msg_timestamp = msg.header.stamp
+
+    if not utilities.is_new_msg_timestamp(self.position_timestamp, msg_timestamp):
+      # Old message
+      return
+    
+    if self.last_rotation_matrix_body_to_vehicle is None:
+      # Impossible to convert positions to body frame
+      return
+    
+    # Positions must be transformed to body
+    self.position_timestamp = msg_timestamp
+    self.position = self.last_rotation_matrix_body_to_vehicle.T @ np.array([msg.point.x, msg.point.y, msg.point.z], dtype=np.float).reshape((3, 1)) 
+
+
+  def _attitude_cb(self, msg : QuaternionStamped) -> None:
+    msg_timestamp = msg.header.stamp
+
+    if not utilities.is_new_msg_timestamp(self.attitude_timestamp, msg_timestamp):
+      # Old message
+      return
+    
+    self.attitude_timestamp = msg_timestamp
+    rotation = Rotation.from_quat([msg.quaternion.x, msg.quaternion.y, msg.quaternion.z, msg.quaternion.w])
+    self.attitude_rpy = rotation.as_euler('xyz', degrees=False).reshape((3, 1))
+    self.last_rotation_matrix_body_to_vehicle = rotation.as_matrix()
 
 
   def _get_position_error(self) -> np.ndarray:
-    if (self.ekf_timestamp is None):
+    if (self.position_timestamp is None):
       return np.zeros((3, 1))
 
     # Using a target-position above the helipad to guide safely
     # target_position = np.array([0, 0, -0.25])
-    # altitude_error = -self.pos_relative_to_helipad[2] # Convert between frames
-    altitude_error = self.pos_relative_to_helipad[2]
-    if np.linalg.norm(self.pos_relative_to_helipad[:2]) > 0.2:
-      altitude_error = altitude_error - 1
-    return np.array([self.pos_relative_to_helipad[0], self.pos_relative_to_helipad[1], altitude_error]) 
+    # altitude_error = -self.position[2] # Convert between frames
+    altitude_error = self.position[2]
+    if np.linalg.norm(self.position[:2]) > 0.2:
+      altitude_error = 0 #altitude_error - 1
+    return np.array([self.position[0], self.position[1], altitude_error], dtype=np.float) 
 
 
   def get_velocity_reference(self, pos_error_body: np.ndarray, ts: float, debug=False) -> np.ndarray:
+    """
+    Almost copy-paste from the code developed by Martin Falang
+    """
 
     control3D = (pos_error_body.shape[0] == 3)
 
@@ -148,9 +167,9 @@ class PIDGuidanceLaw():
     if control3D:
       vz_reference = self._Kp_z*e_z + self._Kd_z*e_dot_z + self._Ki_z*self._error_int[2]
       vz_reference = self._clamp(vz_reference, self._vz_limits)
-      velocity_reference = np.array([vx_reference, vy_reference, vz_reference], dtype=float)
+      velocity_reference = np.array([vx_reference, vy_reference, vz_reference], dtype=np.float)
     else:
-      velocity_reference = np.array([vx_reference, vy_reference, 0], dtype=float)
+      velocity_reference = np.array([vx_reference, vy_reference, 0], dtype=np.float)
 
     if debug:
       print(f"Timestamp: {ts}")

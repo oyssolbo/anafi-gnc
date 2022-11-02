@@ -1,9 +1,13 @@
 <launch>
-    <node
-        name="pure_pursuit_guidance"
-        pkg="guidance"
-        type="pure_pursuit.py"
-        output="screen">
-      <rosparam command="load" file="$(find guidance)/config/config.yaml" />
-    </node>
+
+	<arg name="use_ned_pos_from_gnss" default="false" /> 
+	<param name="use_ned_pos_from_gnss" type="bool" value="$(arg use_ned_pos_from_gnss)" />
+
+  <node
+      name="pure_pursuit_guidance"
+      pkg="guidance"
+      type="pure_pursuit.py"
+      output="screen">
+    <rosparam command="load" file="$(find guidance)/config/config.yaml" />
+  </node>
 </launch>

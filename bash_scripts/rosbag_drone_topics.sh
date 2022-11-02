@@ -44,7 +44,7 @@ ANAFI_OUTPUT_TOPICS="\
         /anafi/link_goodput \
         /anafi/wifi_rssi \
         /anafi/msg_latency \
-        /anafi/ned_pose_from_gnss"
+        /anafi/ned_pos_from_gnss"
 
 ANAFI_CMD_TOPICS="\
         /anafi/cmd_takeoff \
