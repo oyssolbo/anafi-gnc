@@ -6,7 +6,7 @@ class Actions:
   def __init__(self) -> None:
     self.action_str : str = ""
     self.action_frame : str = "ned"
-    self.action_movement : np.ndarray = np.zeros((4, 1))
+    self.action_movement : np.ndarray = np.zeros((4, 1)) # [x, y, z, psi]
     self.action_time : float = -1
   
   def get_action_str(self) -> str:
@@ -60,9 +60,21 @@ class HoverAction(Actions):
     self.action_str = "hover"
     self.action_time = hover_time
 
+class SearchAction(Actions):
+  def __init__(self) -> None:
+    super().__init__()
+
+    self.action_str = "search"
+
 
 def generate_actions(mission_id : int) -> list:#(Actions):
   action_list = []
+
+  if mission_id == -4:
+    action_list.append(TakeoffAction(altitude=2))
+    action_list.append(HoverAction(5))
+    action_list.append(SearchAction())
+
 
   if mission_id == -3:
     action_list.append(TakeoffAction(altitude=2))
@@ -71,7 +83,7 @@ def generate_actions(mission_id : int) -> list:#(Actions):
     action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
     action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
     # action_list.append(TrackAction())
-    action_list.append(LandAction())
+    # action_list.append(LandAction())
 
   elif mission_id == -2:
     action_list.append(TakeoffAction(altitude=2))

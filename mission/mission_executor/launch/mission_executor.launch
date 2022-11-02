@@ -1,5 +1,9 @@
 <?xml version="1.0"?>
 <launch>
+
+	<arg name="control_method" default="mpc" /> 
+	<param name="control_method" type="string" value="$(arg control_method)" />
+
   <node
     name="mission_execution"
     pkg="mission_execution"
