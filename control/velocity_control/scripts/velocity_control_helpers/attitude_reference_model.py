@@ -1,20 +1,21 @@
 #!/usr/bin/python3
 
-# This POS is written by Martin Falang (2021-2022)
+# Most of this POS is written by Martin Falang (2021-2022)
 
 import numpy as np
 
-# def get_attitude_reference_generator(generator_type: str):
-#   if generator_type == "pid":
-#     return PIDReferenceGenerator
-#   elif generator_type == "linear_drag_model":
-#     return LinearDragModelReferenceGenerator
-#   elif generator_type == "ipid":
-#     return iPIDReferenceGenerator
-#   else:
-#     raise ValueError("Invalid generator type")
+def get_attitude_reference_model(generator_type: str):
+  if generator_type == "pid":
+    return PIDReferenceModel
+  elif generator_type == "linear_drag_model":
+    return LinearDragModelReferenceModel
+  elif generator_type == "ipid":
+    return iPIDReferenceModel
+  else:
+    raise ValueError("Invalid generator type")
 
-class GenericAttitudeReferenceGenerator():
+
+class GenericAttitudeReferenceModel():
   def get_attitude_reference(self, v_ref: np.ndarray, v_actual: np.ndarray, timestamp: float):
     raise NotImplementedError
 
@@ -26,7 +27,8 @@ class GenericAttitudeReferenceGenerator():
     else:
       return value
 
-class PIDReferenceGenerator(GenericAttitudeReferenceGenerator):
+
+class PIDReferenceModel(GenericAttitudeReferenceModel):
   def __init__(self, params: dict, limits: dict):
     super().__init__()
 
@@ -109,7 +111,8 @@ class PIDReferenceGenerator(GenericAttitudeReferenceGenerator):
 
     return attitude_reference
 
-class LinearDragModelReferenceGenerator(GenericAttitudeReferenceGenerator):
+
+class LinearDragModelReferenceModel(GenericAttitudeReferenceModel):
   def __init__(self, params: dict, limits: dict):
     super().__init__()
 
@@ -137,8 +140,8 @@ class LinearDragModelReferenceGenerator(GenericAttitudeReferenceGenerator):
     accel_y_desired = vy_ref - vy
 
     # Negative on x axis due to inverse relationship between pitch angle and x-velocity
-    pitch_ref = np.rad2deg(np.arctan(-(accel_x_desired / self._g + (self._d_x * vx) / (self._m * self._g))))
-    roll_ref = np.rad2deg(np.arctan(accel_y_desired / self._g + (self._d_y * vy) / (self._m * self._g)))
+    pitch_ref = np.arctan(-(accel_x_desired / self._g + (self._d_x * vx) / (self._m * self._g)))
+    roll_ref = np.arctan(accel_y_desired / self._g + (self._d_y * vy) / (self._m * self._g))
 
     pitch_ref = self.clamp(pitch_ref, self.pitch_limits)
     roll_ref = self.clamp(roll_ref, self.roll_limits)
@@ -151,14 +154,14 @@ class LinearDragModelReferenceGenerator(GenericAttitudeReferenceGenerator):
 
     return attitude_ref
 
-class iPIDReferenceGenerator(GenericAttitudeReferenceGenerator):
+
+class iPIDReferenceModel(GenericAttitudeReferenceModel):
   def __init__(self, params: dict, limits: dict):
     super().__init__()
 
     self.Kp_x = params["x_axis"]["kp"]
     self.Ki_x = params["x_axis"]["ki"]
     self.Kd_x = params["x_axis"]["kd"]
-    print(params["x_axis"])
     self.alpha_x = params["x_axis"]["alpha"]
 
     self.Kp_y = params["y_axis"]["kp"]
