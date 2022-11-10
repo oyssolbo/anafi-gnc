@@ -4,7 +4,8 @@ import numpy as np
 
 class VelocityReferenceModel():
   """
-  Second order reference model for velocity
+  Second order reference model for horizontal velocity
+  and first order reference model for vertical velocity
 
   The states are:
     x = [u_ref, v_ref, u_ref_dot, v_ref_dot, w_ref]
