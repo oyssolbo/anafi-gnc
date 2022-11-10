@@ -1,15 +1,10 @@
-node_name: "attitude_controller_node"
 node_rate: 20
 
-use_optical_flow_velocities: false  # true -> Using velocity estimates from optical_flow
-                                # false -> Using polled velocity estimates 
-
-use_pure_pursuit_guidance: false    # true -> Using pure pursuit guidance to generate the velocity reference
-                                # false -> Using PID-guidance to generate the velocity reference
 
 attitude_limits:
   pitch: [-5, 5]  # deg
   roll: [-5, 5]   # deg
+
 
 velocity_reference_model:
   omegas: [10, 10]
@@ -19,43 +14,31 @@ velocity_reference_model:
   T_z: 0.5
   K_z: 1
 
-# Some tuning parameters:
-# 0:    0.25, 0.01, 0
-# 1:    7, 0.01, 0
-# 2:    0.125, 0.01, 0.05
-# 3:    0.25, 0.01, 0.01
-# 4:    0.25, 0.01, 0.025
-# 5:    0.25, 0.0125, 0.05
-# 6:    0.25, 0.0125, 0.025
-# 7:    0.2, 0.02, 0.01
-# 8:    0.1, 0.01, 0
-# 9:    0.2, 0.025, 0
-# 10:    0.175, 0.02, 0
 
 pid: 
   x_axis:
-    kp: 0.175  
-    ki: 0.02 
-    kd: 0
+    kp: 0.5   
+    ki: 0.1  
+    kd: 0.2
   y_axis:
-    kp: 0.175 
-    ki: 0.02 
-    kd: 0
+    kp: 0.5 
+    ki: 0.1  
+    kd: 0.2
 
 linear_drag_model:
-  drone_mass: 315
-  g: 9.81
+  drone_mass: 0.320 # This was set to 320, such that Martin used it in grams... Fucking idiot!
+  g: 9.82179 # [m/s²] - for Trondheim at sea level
   dx: 0.08063504
   dy: 0.09929089
 
 ipid:
   x_axis:
     alpha: 1
-    kp: 7
-    ki: 0.1
-    kd: 0.5
+    kp: 0.5   
+    ki: 0.1  
+    kd: 0.2
   y_axis:
     alpha: 1
-    kp: -7
-    ki: -0.1
-    kd: -0.5
+    kp: 0.5 
+    ki: 0.1  
+    kd: 0.2
