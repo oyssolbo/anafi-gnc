@@ -1,40 +1,6 @@
 #!/usr/bin/python3
 
-import numpy as np
-
-import rospy 
-from anafi_uav_msgs.msg import AttitudeSetpoint
-
-
-def pack_attitude_ref_msg(att_ref: np.ndarray) -> AttitudeSetpoint:
-    """Generate a attitude setpoint message attitude setpoints.
-
-    Parameters
-    ----------
-    att_ref : np.ndarray
-        Attitude setpoint. Format: [roll, pitch, yaw_rate, climb_rate]
-        All angles in degrees, climb_rate positive up.
-
-    Returns
-    -------
-    drone_interface.msg.AttitudeSetpoint
-        ROS message with the attitude setpoint
-
-    Author
-    ------ 
-    Martin Falang (2021-2022)
-    
-    """
-
-    msg = AttitudeSetpoint()
-    msg.header.stamp = rospy.Time.now()
-    msg.roll = att_ref[0]
-    msg.pitch = att_ref[1]
-    msg.yaw_rate = att_ref[2]
-    msg.climb_rate = att_ref[3]
-
-    return msg
-
+import rospy
 
 def calculate_timestamp_difference_s(
       oldest_stamp : rospy.Time,
