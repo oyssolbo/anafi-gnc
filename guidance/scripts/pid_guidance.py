@@ -1,5 +1,11 @@
 #!/usr/bin/python3
 
+# This shit is almost directly copied from Martin Falang (2021-2022), to have
+# a reference to compare to
+# The major difference, is the ROSification of the code, such that it actually
+# exploits basic functionalities with ROS 
+
+
 import rospy 
 from geometry_msgs.msg import TwistStamped, PointStamped, QuaternionStamped
 
@@ -20,16 +26,16 @@ class PIDGuidanceLaw():
     self.rate = rospy.Rate(20) # Hardcoded from the pure-pursuit guidance
 
     # Values are directly from the config file Martin used
-    self._Kp_x = 0.5  
-    self._Ki_x = 0    
+    self._Kp_x = 0.5
+    self._Ki_x = 0.0
     self._Kd_x = 0    
 
-    self._Kp_y = 0.5  
-    self._Ki_y = 0    
+    self._Kp_y = 0.5
+    self._Ki_y = 0.0
     self._Kd_y = 0    
 
     self._Kp_z = 0.2  
-    self._Ki_z = 0    
+    self._Ki_z = 0.0 # 0.0    
     self._Kd_z = 0    
 
     self._vx_limits = (-0.3, 0.3) 
@@ -41,11 +47,12 @@ class PIDGuidanceLaw():
     self._prev_error = np.zeros(3)
 
     self.position_timestamp : rospy.Time = None
+    self.attitude_timestamp : rospy.Time = None
+
     self.last_rotation_matrix_body_to_vehicle : np.ndarray = None
 
     # Initialize subscribers
     self.use_ned_pos_from_gnss : bool = rospy.get_param("/use_ned_pos_from_gnss")
-    print(self.use_ned_pos_from_gnss)
     if self.use_ned_pos_from_gnss:
       rospy.loginfo("Node using position estimates from GNSS. Estimates from EKF disabled")
       rospy.Subscriber("/anafi/ned_pos_from_gnss", PointStamped, self._ned_pos_cb)
@@ -86,7 +93,7 @@ class PIDGuidanceLaw():
     
     # Positions must be transformed to body
     self.position_timestamp = msg_timestamp
-    self.position = self.last_rotation_matrix_body_to_vehicle.T @ np.array([msg.point.x, msg.point.y, msg.point.z], dtype=np.float).reshape((3, 1)) 
+    self.position = -self.last_rotation_matrix_body_to_vehicle.T @ np.array([msg.point.x, msg.point.y, msg.point.z], dtype=np.float).reshape((3, 1)) 
 
 
   def _attitude_cb(self, msg : QuaternionStamped) -> None:
@@ -109,9 +116,10 @@ class PIDGuidanceLaw():
     # Using a target-position above the helipad to guide safely
     # target_position = np.array([0, 0, -0.25])
     # altitude_error = -self.position[2] # Convert between frames
-    altitude_error = self.position[2]
-    if np.linalg.norm(self.position[:2]) > 0.2:
+    if np.linalg.norm(self.position[:2]) > 0.5:
       altitude_error = 0 #altitude_error - 1
+    else:
+      altitude_error = self.position[2]
     return np.array([self.position[0], self.position[1], altitude_error], dtype=np.float) 
 
 
@@ -120,7 +128,7 @@ class PIDGuidanceLaw():
     Almost copy-paste from the code developed by Martin Falang
     """
 
-    control3D = (pos_error_body.shape[0] == 3)
+    control3D = True # (pos_error_body.shape[0] == 3)
 
     e_x = pos_error_body[0]
     e_y = pos_error_body[1]
