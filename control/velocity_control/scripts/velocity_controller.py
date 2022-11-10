@@ -11,28 +11,26 @@ import velocity_control_helpers.utilities as utilities
 
 from geometry_msgs.msg import TwistStamped, Vector3Stamped
 from olympe_bridge.msg import AttitudeCommand
-from std_srvs.srv import SetBool, SetBoolResponse
+from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 
-import warnings
-warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 class VelocityController():
 
   def __init__(self) -> None:
 
     # Initializing node
-    node_name = rospy.get_param("~node_name", default = "attitude_controller_node")
-    node_rate = rospy.get_param("~node_rate", default = 20)
+    rospy.init_node("attitude_controller_node")
+    node_rate = rospy.get_param("~node_rate")
     self.dt = 1.0 / node_rate 
-
-    rospy.init_node(node_name)
     self.rate = rospy.Rate(node_rate)
 
     # Initializing reference models
-    pid_controller_parameters = rospy.get_param("~pid")
+    selected_attitude_reference_method = rospy.get_param("/attitude_reference_generator", default="pid") 
+    attitude_reference_parameters = rospy.get_param("~" + selected_attitude_reference_method)
     attitude_limits = rospy.get_param("~attitude_limits")
-    self.attitude_reference_model = attitude_reference_model.PIDReferenceGenerator(
-      params=pid_controller_parameters,
+    selected_attitude_reference_model = attitude_reference_model.get_attitude_reference_model(selected_attitude_reference_method)
+    self.attitude_reference_model = selected_attitude_reference_model(
+      params=attitude_reference_parameters,
       limits=attitude_limits 
     )
 
@@ -52,15 +50,15 @@ class VelocityController():
     rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller)
 
     # Setup subscribers 
-    self.use_optical_flow_velocities : bool = rospy.get_param("~use_optical_flow_velocities", default = 1)
-    if self.use_optical_flow_velocities:
+    self.use_optical_flow_as_feedback : bool = rospy.get_param("/use_optical_flow_as_feedback")
+    if self.use_optical_flow_as_feedback:
       rospy.loginfo("Node using optical flow velocity estimates as feedback")
       rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self._optical_flow_velocities_cb)
     else:
       rospy.loginfo("Node using polled velocity estimates as feedback")
-      rospy.Subscriber("/anafi/polled_velocities", TwistStamped, self._polled_velocities_cb)
+      rospy.Subscriber("/anafi/polled_body_velocities", TwistStamped, self._polled_velocities_cb)
 
-    use_pure_pursuit_guidance : bool = rospy.get_param("~use_pure_pursuit_guidance", default = 0)
+    use_pure_pursuit_guidance : bool = rospy.get_param("/use_pure_pursuit_guidance")
     if use_pure_pursuit_guidance:
       rospy.loginfo("Node using pure pursuit guidance used to generate velocity references")
       rospy.Subscriber("/guidance/pure_pursuit/velocity_reference", TwistStamped, self._reference_velocities_cb)
@@ -73,17 +71,15 @@ class VelocityController():
 
     # Initial values
     self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
-    self.polled_velocities : np.ndarray = np.zeros((3, 1))
-    self.optical_flow_velocities : np.ndarray = np.zeros((3, 1))
+    self.velocities : np.ndarray = np.zeros((3, 1))
 
-    self.polled_velocities_timestamp : std_msgs.msg.Time = None
-    self.optical_flow_velocities_timestamp : std_msgs.msg.Time = None
+    self.velocities_timestamp : std_msgs.msg.Time = None
     self.guidance_timestamp : std_msgs.msg.Time = None
 
     self.is_controller_active : bool = False
 
 
-  def _reference_velocities_cb(self, msg : TwistStamped):
+  def _reference_velocities_cb(self, msg : TwistStamped) -> None:
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.guidance_timestamp, msg_timestamp):
@@ -94,7 +90,7 @@ class VelocityController():
     self.guidance_reference_velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
 
 
-  def _enable_controller(self, msg : SetBool):
+  def _enable_controller(self, msg : SetBoolRequest) -> SetBoolResponse:
     self.is_controller_active = msg.data
 
     res = SetBoolResponse()
@@ -106,34 +102,33 @@ class VelocityController():
   def _polled_velocities_cb(self, msg : TwistStamped) -> None:
     msg_timestamp = msg.header.stamp
 
-    if not utilities.is_new_msg_timestamp(self.polled_velocities_timestamp, msg_timestamp):
+    if not utilities.is_new_msg_timestamp(self.velocities_timestamp, msg_timestamp):
       # Old message
       return
     
-    self.polled_velocities_timestamp = msg_timestamp     
-    self.polled_velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
+    self.velocities_timestamp = msg_timestamp     
+    self.velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
 
 
   def _optical_flow_velocities_cb(self, msg : Vector3Stamped) -> None:
     msg_timestamp = msg.header.stamp
 
-    if not utilities.is_new_msg_timestamp(self.optical_flow_velocities_timestamp, msg_timestamp):
+    if not utilities.is_new_msg_timestamp(self.velocities_timestamp, msg_timestamp):
       # Old message
       return
     
-    self.optical_flow_velocities_timestamp = msg_timestamp     
+    self.velocities_timestamp = msg_timestamp     
     
     # Important: 
     # The signs and order of elements are different for the optical flow compared to the 
     # polled-velocities. This is due to having the frame defined in the images, and not in body
-    self.optical_flow_velocities = -np.array([msg.vector.y, msg.vector.x, msg.vector.z]).T 
+    self.velocities = -np.array([msg.vector.y, msg.vector.x, msg.vector.z]).T 
 
 
   def publish_attitude_ref(self) -> None:
     attitude_cmd_msg = AttitudeCommand()
 
     x_d = np.zeros((5, 1))
-    # self.is_controller_active = True
     while not rospy.is_shutdown():
       if self.is_controller_active:
         x_d = self.velocity_reference_model.get_filtered_reference(
@@ -141,18 +136,11 @@ class VelocityController():
           v_ref_raw=self.guidance_reference_velocities,
           dt=self.dt
         )
-        
-        if self.use_optical_flow_velocities:
-          v = self.optical_flow_velocities
-          ts = self.optical_flow_velocities_timestamp
-        else:
-          v = self.polled_velocities
-          ts = self.polled_velocities_timestamp
 
         att_ref = self.attitude_reference_model.get_attitude_reference(
           v_ref=(x_d[:2]).reshape((2, 1)),
-          v=(v[:2]).reshape((2, 1)), 
-          ts=ts,
+          v=(self.velocities[:2]).reshape((2, 1)), 
+          ts=self.velocities_timestamp,
           debug=False
         )
 
