@@ -40,7 +40,7 @@ class VelocityReferenceModel():
         [0,        0,       K_z / T_z]
     ])
 
-  def get_filtered_reference(
+  def get_velocity_reference(
         self, 
         xd_prev   : np.ndarray, 
         v_ref_raw : np.ndarray, 
