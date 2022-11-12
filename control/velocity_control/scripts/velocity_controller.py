@@ -6,12 +6,14 @@ import rospy
 import std_msgs.msg
 
 import velocity_control_helpers.velocity_reference_model as velocity_reference_model
-import velocity_control_helpers.attitude_reference_model as attitude_reference_model
+import velocity_control_helpers.controllers as controllers
 import velocity_control_helpers.utilities as utilities
 
 from geometry_msgs.msg import TwistStamped, Vector3Stamped
 from olympe_bridge.msg import AttitudeCommand
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
+
+np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
 
 
 class VelocityController():
@@ -25,12 +27,12 @@ class VelocityController():
     self.rate = rospy.Rate(node_rate)
 
     # Initializing reference models
-    selected_attitude_reference_method = rospy.get_param("/attitude_reference_generator", default="pid") 
-    attitude_reference_parameters = rospy.get_param("~" + selected_attitude_reference_method)
+    selected_control_method = rospy.get_param("/controller", default="pid") 
+    controller_parameters = rospy.get_param("~" + selected_control_method)
     attitude_limits = rospy.get_param("~attitude_limits")
-    selected_attitude_reference_model = attitude_reference_model.get_attitude_reference_model(selected_attitude_reference_method)
-    self.attitude_reference_model = selected_attitude_reference_model(
-      params=attitude_reference_parameters,
+    selected_controller = controllers.get_controller(selected_control_method)
+    self.controller = selected_controller(
+      params=controller_parameters,
       limits=attitude_limits 
     )
 
@@ -60,10 +62,10 @@ class VelocityController():
 
     use_pure_pursuit_guidance : bool = rospy.get_param("/use_pure_pursuit_guidance")
     if use_pure_pursuit_guidance:
-      rospy.loginfo("Node using pure pursuit guidance used to generate velocity references")
+      rospy.loginfo("Node using pure pursuit guidance as velocity reference")
       rospy.Subscriber("/guidance/pure_pursuit/velocity_reference", TwistStamped, self._reference_velocities_cb)
     else:
-      rospy.loginfo("Node using PID-based guidance used to generate velocity references")
+      rospy.loginfo("Node using PID-based guidance as velocity reference")
       rospy.Subscriber("/guidance/pid/velocity_reference", TwistStamped, self._reference_velocities_cb)
 
     # Setup publishers
@@ -125,26 +127,42 @@ class VelocityController():
     self.velocities = -np.array([msg.vector.y, msg.vector.x, msg.vector.z]).T 
 
 
+  def _prevent_underflow(
+        self, 
+        arr       : np.ndarray, 
+        min_value : float       = 1e-6
+      ) -> np.ndarray:
+    """
+    Preventing underflow to setting all values with an absolute value below
+    @p min_value to 0 
+    """
+    with np.nditer(arr, op_flags=['readwrite']) as iterator:
+      for val in iterator:
+        if np.abs(val) < min_value:
+          val[...] = 0
+    return arr
+
+
   def publish_attitude_ref(self) -> None:
     attitude_cmd_msg = AttitudeCommand()
 
-    x_d = np.zeros((5, 1))
+    v_ref = np.zeros((5, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
-        x_d = self.velocity_reference_model.get_filtered_reference(
-          xd_prev=x_d, 
+        v_ref = self.velocity_reference_model.get_velocity_reference(
+          xd_prev=v_ref, 
           v_ref_raw=self.guidance_reference_velocities,
           dt=self.dt
         )
 
-        att_ref = self.attitude_reference_model.get_attitude_reference(
-          v_ref=(x_d[:2]).reshape((2, 1)),
-          v=(self.velocities[:2]).reshape((2, 1)), 
-          ts=self.velocities_timestamp,
-          debug=False
+        att_ref = self.controller.get_attitude_reference(
+          v_ref=v_ref,
+          v=self.velocities, 
+          ts=self.velocities_timestamp
         )
+        att_ref = self._prevent_underflow(att_ref)
 
-        att_ref_3D = np.array([att_ref[0], -att_ref[1], 0, x_d[4]], dtype=np.float64) 
+        att_ref_3D = np.array([att_ref[0], -att_ref[1], 0, v_ref[4]], dtype=np.float64) 
         attitude_cmd_msg.header.stamp = rospy.Time.now()
         attitude_cmd_msg.roll = att_ref_3D[0]   
         attitude_cmd_msg.pitch = att_ref_3D[1]
@@ -155,7 +173,7 @@ class VelocityController():
 
       else:
         self.guidance_reference_velocities = np.zeros((3, 1))
-        x_d = np.zeros((5, 1))
+        v_ref = np.zeros((5, 1))
       
       self.rate.sleep()
 
