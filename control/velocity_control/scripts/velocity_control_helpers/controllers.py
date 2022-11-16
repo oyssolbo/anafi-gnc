@@ -179,6 +179,9 @@ class iPID(GenericController):
     self.prev_error : np.ndarray = np.zeros(2)
     self.prev_ts : float = None
 
+    self.vel_dot_ref_lp : np.ndarray = np.zeros(2)
+    self.vel_dot_lp : np.ndarray = np.zeros(2)
+
 
   def get_attitude_reference(
         self, 
@@ -187,13 +190,13 @@ class iPID(GenericController):
         ts    : float
       ) -> np.ndarray:
 
-    error = (-v[:2] + v_ref[:2].T).reshape((2, ))
+    error = (-v[:2] + v_ref[:2].T).reshape((2))
 
     error_surge = error[0]
     error_sway = error[1]
 
-    surge_dot_ref = v_ref[3]
-    sway_dot_ref = v_ref[4]
+    surge_dot_ref = v_ref[3][0]
+    sway_dot_ref = v_ref[4][0]
 
     if self.prev_ts is not None and ts != self.prev_ts:
       dt = (ts - self.prev_ts).to_sec()
@@ -216,24 +219,32 @@ class iPID(GenericController):
       error_surge_dot = error_sway_dot = 0 
       surge_dot_hat = sway_dot_hat = 0
 
-    # Intelligent model-free PID control
+    error_surge_dot_hat = surge_dot_ref - surge_dot_hat
+    error_sway_dot_hat = sway_dot_ref - sway_dot_hat
+
+    # Intelligent model-free control
+    pd_pitch = self.Kp_x * error_surge + self.Kd_x * error_surge_dot
+    pd_roll = self.Kp_y * error_sway + self.Kd_y
+
     pid_pitch = self.Kp_x * error_surge + self.Kd_x * error_surge_dot + self.Ki_x * self.error_int[0]
     pid_roll = self.Kp_y * error_sway + self.Kd_y * error_sway_dot + self.Ki_y * self.error_int[1]
 
-    adaptive_pitch_ref = (surge_dot_ref - pid_pitch + self.delta_hat_pitch)
-    adaptive_roll_ref = (sway_dot_ref - pid_roll + self.delta_hat_roll)
+    adaptive_pitch_ref = surge_dot_ref + pid_pitch - self.delta_hat_pitch #(surge_dot_ref + pid_pitch - self.delta_hat_pitch)
+    adaptive_roll_ref = sway_dot_ref + pid_roll - self.delta_hat_roll #(sway_dot_ref + pid_roll - self.delta_hat_roll)
 
     adaptive_pitch_ref = self._clamp(adaptive_pitch_ref, self.pitch_limits)
     adaptive_roll_ref = self._clamp(adaptive_roll_ref, self.roll_limits)
 
     attitude_reference = np.array([adaptive_roll_ref, adaptive_pitch_ref], dtype=np.float)
 
-    # self.delta_hat_pitch = self.delta_hat_pitch + (surge_dot_ref - adaptive_pitch_ref - pid_pitch)
-    # self.delta_hat_roll = self.delta_hat_roll + (sway_dot_ref - adaptive_roll_ref - pid_roll) # But this should just be 0....
+    # Using MRAC on first order system, showed that delta_hat_dot = -gamma * error_axis, where gamma > 0 and error_axis = ref - measurement
+    gamma = 0.01
+    dt = 0.05
+    delta_hat_pitch_dot = -self.delta_hat_pitch + gamma * error_surge
+    delta_hat_roll_dot = -self.delta_hat_roll + gamma * error_sway 
 
-    # Using MRAC on first order system, showed that delta_hat_dot = - gamma * error_axis, where gamma > 0 and error_axis = ref - measurement
-    self.delta_hat_pitch = self.delta_hat_pitch + (surge_dot_ref - surge_dot_hat) #error_surge
-    self.delta_hat_roll = self.delta_hat_roll + (sway_dot_ref - sway_dot_hat) # error_sway
+    self.delta_hat_pitch = self.delta_hat_pitch + dt * delta_hat_pitch_dot 
+    self.delta_hat_roll = self.delta_hat_roll + dt * delta_hat_roll_dot
 
     self.prev_error = np.array([error_surge, error_sway], dtype=np.float)
     self.prev_ts = ts
