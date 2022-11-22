@@ -1,9 +1,4 @@
-node_name: "mpc_node"
 node_rate: 20
-
-attitude_limits:
-  pitch: [-5, 5]  # deg
-  roll: [-5, 5]   # deg
 
 use_optical_flow_velocities: false  # true -> Using velocity estimates from optical_flow
                                     # false -> Using polled velocity estimates 
@@ -28,31 +23,30 @@ mpc_config:
     gravitational_acceleration: 9.82179 # [m/s²] - for Trondheim at sea level
     
   tuning_parameters:
-    nx: 9 # 10 - could add integral action for x,y,z and drop the state estimates for heave and yaw 
+    nx: 7 
     nu: 4
-    m: 1
+    m:  1
 
     objective_function:
-      q_diagonal: [2, 2, 1.5, 1.25, 1.25, 1, 0.5, 0.5, 0.001]
-      r_diagonal: [1, 1, 0, 1]
-    
-    # slack_constraints: [0, 0, 0] 
-
-    # bounds:
-    #   x:
-    #     lb: [-inf, -inf, -inf, -2, -2, -0.1, -10*np.pi/180.0, -10*np.pi/180.0, -inf]
-    #     ub: [inf, inf, inf, 2, 2, 0.1, 10*np.pi/180.0, 10*np.pi/180.0, inf]
-    #   u:
-    #     lb: [-10*np.pi/180.0, -10*np.pi/180.0, -25*np.pi/180.0, -1.0]
-    #     ub: [10*np.pi/180.0, 10*np.pi/180.0, 25*np.pi/180.0, 1.0]
+      # Standard:  x  y  z    u     v     w     phi   theta   
+      # q_diagonal: [2, 2, 1.5, 0.25, 0.25, 0.25, 0.25, 0.25] # [1.25, 1, 1, 0.2, 0.175, 0.1, 0.175, 0.2, 0.0001]  # [2, 2, 1.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.001] appears very good in sim
       
+      # Standard:  x  y  z    u     v     phi   theta   
+      q_diagonal: [2, 2, 1.5, 0.25, 0.25, 0.25, 0.25]
+
+      # Augmented: xi   yi   x  y  z    u     v     phi   theta    
+      # q_diagonal: [0.1, 0.1, 2, 2, 1.5, 0.25, 0.25, 0.25, 0.25]
+      
+      r_diagonal: [2, 2, 0, 1]                                      
     
-    prediction_horizon: 10
-    robust_horizon: 0
-    time_step: 0.02          # [s] 
+    prediction_horizon: 6
+    robust_horizon:     0
+    time_step:          0.05  # [s] 
+
+    # Should add the constraints here - future revision
 
   solving_parameters:
     collocation_degree: 2
     solver_options:
-      solver: "MA57"  # MA57 is recommended, https://www.hsl.rl.ac.uk/ipopt/
+      solver: "mumps"  # MA57 is recommended, https://www.hsl.rl.ac.uk/ipopt/, but some installation is broken
       debug_level: 0
