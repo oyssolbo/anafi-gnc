@@ -25,7 +25,7 @@ mpc_config:
     m:  1
 
     objective_function:
-      # States:    x  y  z  u     v     phi   theta r  
+      # States:    x  y  z  u     v     phi   theta psi  
       q_diagonal: [1, 1, 1, 0.25, 0.25, 0.25, 0.25, 0.01]
 
       # Control:   phi_ref, theta_ref, r_ref, thrust_ref
