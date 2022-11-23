@@ -1,8 +1,5 @@
 node_rate: 20
 
-use_optical_flow_velocities: false  # true -> Using velocity estimates from optical_flow
-                                    # false -> Using polled velocity estimates 
-
 mpc_config:
   system_parameters:
     drone:
@@ -23,30 +20,32 @@ mpc_config:
     gravitational_acceleration: 9.82179 # [m/s²] - for Trondheim at sea level
     
   tuning_parameters:
-    nx: 7 
+    nx: 8 
     nu: 4
     m:  1
 
     objective_function:
-      # Standard:  x  y  z    u     v     w     phi   theta   
-      # q_diagonal: [2, 2, 1.5, 0.25, 0.25, 0.25, 0.25, 0.25] # [1.25, 1, 1, 0.2, 0.175, 0.1, 0.175, 0.2, 0.0001]  # [2, 2, 1.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.001] appears very good in sim
-      
-      # Standard:  x  y  z    u     v     phi   theta   
-      q_diagonal: [2, 2, 1.5, 0.25, 0.25, 0.25, 0.25]
+      # States:    x  y  z  u     v     phi   theta r  
+      q_diagonal: [1, 1, 1, 0.25, 0.25, 0.25, 0.25, 0.01]
 
-      # Augmented: xi   yi   x  y  z    u     v     phi   theta    
-      # q_diagonal: [0.1, 0.1, 2, 2, 1.5, 0.25, 0.25, 0.25, 0.25]
-      
-      r_diagonal: [2, 2, 0, 1]                                      
+      # Control:   phi_ref, theta_ref, r_ref, thrust_ref
+      r_diagonal: [2,       2,         0,     1]                                      
     
-    prediction_horizon: 6
+    prediction_horizon: 12 # Not more than 15 - otherwise too aggressive
     robust_horizon:     0
     time_step:          0.05  # [s] 
 
     # Should add the constraints here - future revision
+    constraints:
+      x:
+        lb: [-inf, -inf, -100, -4, -4, -5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0]
+        ub: [inf, inf, 0.5, 4, 4, 5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0]
+      u:
+        lb: [-5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0, -0.15]
+        ub: [5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0, 0.15]
 
   solving_parameters:
     collocation_degree: 2
     solver_options:
       solver: "mumps"  # MA57 is recommended, https://www.hsl.rl.ac.uk/ipopt/, but some installation is broken
-      debug_level: 0
+      debug_level: 1
