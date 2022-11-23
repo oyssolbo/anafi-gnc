@@ -50,12 +50,20 @@ class MPCSolver():
     self.prediction_horizon = tuning_parameters["prediction_horizon"]
     self.robust_horizon = tuning_parameters["robust_horizon"]
     self.time_step = tuning_parameters["time_step"]
+    
+    # constraints = tuning_parameters["constraints"]
+    # self.x_lb = [float(val) for val in constraints["x"]["lb"]]
+    # self.x_ub = constraints["x"]["ub"]
+    # self.u_lb = constraints["u"]["lb"]
+    # self.u_ub = constraints["u"]["ub"]
 
     assert len(self.q_diagonal) == self.nx, "Number of states must match the size of the Q-matrix"
     assert len(self.r_diagonal) == self.nu, "Number of inputs must match the size of the R-matrix"
     assert isinstance(self.prediction_horizon, int) and self.prediction_horizon >= 1, "Prediction horizon must an integer at least be 1"
     assert isinstance(self.robust_horizon, int) and self.robust_horizon >= 0, "Robust horizon must be an integer at least be 0"
     assert isinstance(self.time_step, float) and self.time_step > 1e-3, "Time step must be a float and larger than 1 ms"
+    # assert len(self.x_lb) == self.nx == len(self.x_ub), "Number of states must match constraints"
+    # assert len(self.u_lb) == self.nu == len(self.u_ub), "Number of control inputs must match constraints"
 
 
     # Extracting solving-parameters
@@ -80,12 +88,16 @@ class MPCSolver():
     # may be a better method to reduce the program complexity  
     roll = x[5]
     pitch = x[6]
+    yaw = x[7]
 
     cos_roll = casadi.cos(roll)
     sin_roll = casadi.sin(roll)
 
     cos_pitch = casadi.cos(pitch)
     sin_pitch = casadi.sin(pitch)
+
+    cos_yaw = casadi.cos(yaw)
+    sin_yaw = casadi.sin(yaw)
 
     # Assumning yaw can be neglected - major assumption!
     rotation_matrix_x = np.array(
@@ -102,7 +114,14 @@ class MPCSolver():
         [-sin_pitch, 0, cos_pitch]
       ]
     )
-    rotation_matrix_body_to_vehicle = rotation_matrix_y @ rotation_matrix_x
+    rotation_matrix_z = np.array(
+      [
+        [cos_yaw, -sin_yaw, 0],
+        [sin_yaw, cos_yaw, 0],
+        [0, 0, 1]
+      ]
+    )
+    rotation_matrix_body_to_vehicle = rotation_matrix_z @ rotation_matrix_y @ rotation_matrix_x
     rotation_matrix_body_to_vehicle = casadi.SX(rotation_matrix_body_to_vehicle)
     rotation_matrix_vehicle_to_body = casadi.transpose(rotation_matrix_body_to_vehicle)
 
@@ -117,7 +136,6 @@ class MPCSolver():
     velocity_body = rotation_matrix_body_to_vehicle @ velocity_ned
 
     # Derivatives
-    # Assuming that the positions are in body 
     d_position_body = velocity_body
 
     d_horizontal_vel = np.eye(2, 3) @ (
@@ -127,160 +145,11 @@ class MPCSolver():
     d_rpy = np.array(
       [
         [(self.k_roll * u[0] - roll) / self.tau_roll], 
-        [(self.k_pitch * u[1] - pitch) / self.tau_pitch]
+        [(self.k_pitch * u[1] - pitch) / self.tau_pitch],
+        [0]#[u[2]]
       ]
     )
     return casadi.vertcat(*[d_position_body, d_horizontal_vel, d_rpy])
-
-
-    # # Standard MPC
-
-    # # Extracting the symbolic states 
-    # velocity_body = np.array(
-    #   [
-    #     [x[2]], 
-    #     [x[3]], 
-    #     [u[2]]
-    #   ]
-    # )
-
-    # # Ideally, one would like to run Scipy's rotation with the current angles, but this produces
-    # # NAN-values when symbolic variables are used in the program 
-    # # rotation_matrix_body_to_vehicle = Rotation.from_euler("xyz", np.array([x[6], x[7], x[8]])).as_matrix()
-
-    # # This is an ugly and inefficient method, but it works with symbolic variables
-    # # The use of cos and sin doubles the complexity of the program, and assuming small angles 
-    # # may be a better method to reduce the program complexity  
-    # roll = x[6]
-    # pitch = x[7]
-    # # yaw = x[8]
-
-    # cos_roll = 1 # casadi.cos(roll)
-    # sin_roll = roll # casadi.sin(roll)
-
-    # cos_pitch = 1 # casadi.cos(pitch)
-    # sin_pitch = pitch # casadi.sin(pitch)
-
-    # # Assumning yaw can be neglected - major assumption!
-    # cos_yaw = 1 # casadi.cos(yaw)
-    # sin_yaw = 0 # casadi.sin(yaw)
-
-    # rotation_matrix_x = np.array(
-    #   [
-    #     [1, 0, 0],
-    #     [0, cos_roll, -sin_roll],
-    #     [0, sin_roll, cos_roll]
-    #   ]
-    # )
-    # rotation_matrix_y = np.array(
-    #   [
-    #     [cos_pitch, 0, sin_pitch],
-    #     [0, 1, 0],
-    #     [-sin_pitch, 0, cos_pitch]
-    #   ]
-    # )
-    # rotation_matrix_z = np.array(
-    #   [
-    #     [cos_yaw, -sin_yaw, 0],
-    #     [sin_yaw, cos_yaw, 0],
-    #     [0, 0, 1]
-    #   ]
-    # )
-    # rotation_matrix_body_to_vehicle = rotation_matrix_z @ rotation_matrix_y @ rotation_matrix_x
-    # rotation_matrix_body_to_vehicle = casadi.SX(rotation_matrix_body_to_vehicle)
-    # rotation_matrix_vehicle_to_body = casadi.transpose(rotation_matrix_body_to_vehicle)
-
-    # # Derivatives
-    # # Assuming that the positions are in body 
-    # d_position_body = velocity_body
-    # # d_position_body = rotation_matrix_body_to_vehicle @ np.array(
-    # #   [
-    # #     [x[3]], 
-    # #     [x[4]], 
-    # #     [u[3]]  
-    # #   ]
-    # # )
-
-    # d_horizontal_vel = np.eye(2, 3) @ (
-    #   ((rotation_matrix_vehicle_to_body @ self.g_ned) - self.linear_drag_matrix @ velocity_body) / (self.drone_mass)
-    # )
-    # d_vertical_vel = 0  # -u[3] # Change in velocity defined in NED, while the thrust is in ENU
-    #                     # Unsure if the change of the vertical state should be modelled
-    #                     # If not, could reduce the state space by two states - this and yaw
-
-    # d_rpy = np.array(
-    #   [
-    #     [(self.k_roll * u[0] - x[6]) / self.tau_roll], 
-    #     [(self.k_pitch * u[1] - x[7]) / self.tau_pitch], 
-    #     [0]#u[2]]
-    #   ]
-    # )
-    # print(*[d_position_body, d_horizontal_vel, d_vertical_vel, d_rpy])
-    # return casadi.vertcat(*[d_position_body, d_horizontal_vel, d_vertical_vel, d_rpy])
-
-
-    # Augmented state space with integral action
-    # x = [xi, yi, x, y, z, u, v, phi, theta]
-    # pos_body = np.array(
-    #   [
-    #     [x[2]], 
-    #     [x[3]] 
-    #   ]
-    # )
-
-    # velocity_body = np.array(
-    #   [
-    #     [x[5]], 
-    #     [x[6]],
-    #     [u[3]]
-    #   ]
-    # )
-
-    # roll = x[7]
-    # pitch = x[8]
-
-    # cos_roll = 1 
-    # sin_roll = roll 
-
-    # cos_pitch = 1 
-    # sin_pitch = pitch 
-
-    # # Assumning yaw can be neglected - major assumption!
-
-    # rotation_matrix_x = np.array(
-    #   [
-    #     [1, 0,          0],
-    #     [0, cos_roll,  -sin_roll],
-    #     [0, sin_roll,   cos_roll]
-    #   ]
-    # )
-    # rotation_matrix_y = np.array(
-    #   [
-    #     [cos_pitch,   0,  sin_pitch],
-    #     [0,           1,  0],
-    #     [-sin_pitch,  0,  cos_pitch]
-    #   ]
-    # )
-
-    # rotation_matrix_body_to_vehicle = rotation_matrix_y @ rotation_matrix_x
-    # rotation_matrix_body_to_vehicle = casadi.SX(rotation_matrix_body_to_vehicle)
-    # rotation_matrix_vehicle_to_body = casadi.transpose(rotation_matrix_body_to_vehicle)
-
-    # # Derivatives
-    # d_integrated_position_body = pos_body
-    # d_position_body = velocity_body
-    # d_horizontal_vel = (
-    #   np.eye(2, 3) @ ((rotation_matrix_vehicle_to_body @ self.g_ned) - self.linear_drag_matrix @ velocity_body) / (self.drone_mass)
-    # )
-
-    # d_rp = np.array(
-    #   [
-    #     [(self.k_roll * u[0] - roll) / self.tau_roll], 
-    #     [(self.k_pitch * u[1] - pitch) / self.tau_pitch]
-    #   ]
-    # )
-    # return casadi.vertcat(*[d_integrated_position_body, d_position_body, d_horizontal_vel, d_rp])
-
 
 
   def _setup_model(self) -> None:
@@ -347,12 +216,12 @@ class MPCSolver():
     mpc_solver.bounds['lower', '_x', 'x'] = [\
                                               -inf, -inf, -100, \
                                               -4, -4, \
-                                              -5*np.pi/180.0, -5*np.pi/180.0
+                                              -5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0
                                             ]
     mpc_solver.bounds['upper', '_x', 'x'] = [\
                                               inf, inf, 0.5, \
                                               4, 4, \
-                                              5*np.pi/180.0, 5*np.pi/180.0
+                                              5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0
                                             ]
     
     mpc_solver.bounds['lower', '_u', 'u'] = [-5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0, -0.15]
