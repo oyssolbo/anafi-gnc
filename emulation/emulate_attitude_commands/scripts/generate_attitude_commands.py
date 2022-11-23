@@ -46,21 +46,23 @@ class GenerateAttitudeCommands():
     return xd_next
 
   def generate_attitude_commands(self) -> None:
-    test_angle_rad = np.deg2rad(10)
+    test_angle_rad = np.deg2rad(20)
 
     roll = [0] * 7
     pitch = [0] * 7
-    if self.estimate_models:
-      if self.estimate_roll_models:
-        rospy.loginfo("Generating commands for roll")
-        roll = [0, test_angle_rad, 0, 0, -test_angle_rad, 0, 0]
-      else:
-        rospy.loginfo("Generating commands for pitch")
-        pitch = [0, test_angle_rad, 0, 0, -test_angle_rad, 0, 0]
+    # if self.estimate_models:
+    #   if self.estimate_roll_models:
+    #     rospy.loginfo("Generating commands for roll")
+    #     roll = [0, test_angle_rad, 0, 0, -test_angle_rad, 0, 0]
+    #   else:
+    #     rospy.loginfo("Generating commands for pitch")
+    #     pitch = [0, test_angle_rad, 0, 0, -test_angle_rad, 0, 0]
 
     wait_time = self.time_to_stabilize
 
-    heave_velocities = [0, 0, 0.1, 0, -0.1, 0, 0]
+    heave_velocities = [0, 0, 0.5, 0, -0.5, 0, 0]
+    roll = [test_angle_rad / 2.0, 0, 0, -test_angle_rad / 2.0, 0, 0, 0]
+    pitch = [0, test_angle_rad, 0, 0, -test_angle_rad, 0, 0]
 
     i = 0
     attitude_reference = np.zeros((2, 1))
@@ -76,7 +78,7 @@ class GenerateAttitudeCommands():
       cmd_msg.roll = attitude_cmd[0] 
       cmd_msg.pitch = attitude_cmd[1]
       cmd_msg.yaw = 0
-      cmd_msg.gaz = 0
+      cmd_msg.gaz = heave_velocities[i]
       self.attitude_command_pub.publish(cmd_msg)
 
       if (rospy.Time.now() - start_time).to_sec() > wait_time:
@@ -84,20 +86,20 @@ class GenerateAttitudeCommands():
         i += 1
         if i >= len(roll):
           i = 0
-          self.frequency += 0.5
+          # self.frequency += 0.5
 
         angles_list = [roll[i], pitch[i]]
         attitude_reference = np.array(angles_list).T
 
-        if any(angles_list):
-          # Desired roll or pitch is nonzero
-          wait_time = 1 / self.frequency
-          if wait_time <= 1.5 * self.dt:
-            rospy.loginfo("Node too slow for desired rate. Aborting")
-            break 
+        # if any(angles_list):
+        #   # Desired roll or pitch is nonzero
+        #   wait_time = 1 / self.frequency
+        #   if wait_time <= 1.5 * self.dt:
+        #     rospy.loginfo("Node too slow for desired rate. Aborting")
+        #     break 
 
-        else:
-          wait_time = self.time_to_stabilize
+        # else:
+        #   wait_time = self.time_to_stabilize
 
         start_time = rospy.Time.now()
 
