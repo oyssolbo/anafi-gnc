@@ -9,9 +9,10 @@ import velocity_control_helpers.velocity_reference_model as velocity_reference_m
 import velocity_control_helpers.controllers as controllers
 import velocity_control_helpers.utilities as utilities
 
-from geometry_msgs.msg import TwistStamped, Vector3Stamped
+from geometry_msgs.msg import TwistStamped, Vector3Stamped, QuaternionStamped
 from olympe_bridge.msg import AttitudeCommand
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
+from scipy.spatial.transform import Rotation
 
 np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
 
@@ -68,13 +69,17 @@ class VelocityController():
       rospy.loginfo("Node using PID-based guidance as velocity reference")
       rospy.Subscriber("/guidance/pid/velocity_reference", TwistStamped, self._reference_velocities_cb)
 
+    rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
+
     # Setup publishers
     self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
 
     # Initial values
     self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
     self.velocities : np.ndarray = np.zeros((3, 1))
+    self.quaternion_body_to_ned : np.ndarray = np.array([1, 0, 0, 0], dtype=np.float)
 
+    self.attitude_timestamp : std_msgs.msg.Time = None
     self.velocities_timestamp : std_msgs.msg.Time = None
     self.guidance_timestamp : std_msgs.msg.Time = None
 
@@ -120,11 +125,30 @@ class VelocityController():
       return
     
     self.velocities_timestamp = msg_timestamp     
+    self.velocities = np.array([msg.vector.x, msg.vector.y, msg.vector.z]).T
+
+
+  def _attitude_cb(self, msg : QuaternionStamped) -> None:
+    msg_timestamp = msg.header.stamp
+
+    if not utilities.is_new_msg_timestamp(self.attitude_timestamp, msg_timestamp):
+      # Old message
+      return
     
-    # Important: 
-    # The signs and order of elements are different for the optical flow compared to the 
-    # polled-velocities. This is due to having the frame defined in the images, and not in body
-    self.velocities = -np.array([msg.vector.y, msg.vector.x, msg.vector.z]).T 
+    self.attitude_timestamp = msg_timestamp     
+    self.quaternion_body_to_ned = np.array([msg.quaternion.x, msg.quaternion.y, msg.quaternion.z, msg.quaternion.w]).T
+
+
+  def _convert_body_velocities_to_ned(
+        self, 
+        velocities_body : np.ndarray
+      ) -> np.ndarray:
+    """
+    Obs: Future improvement to use tf2 instead of manually converting these
+    measurements 
+    """
+    rot_body_to_ned = Rotation(quat=self.quaternion_body_to_ned).as_matrix()
+    return rot_body_to_ned.T @ velocities_body
 
 
   def _prevent_underflow(
@@ -146,23 +170,24 @@ class VelocityController():
   def publish_attitude_ref(self) -> None:
     attitude_cmd_msg = AttitudeCommand()
 
-    v_ref = np.zeros((5, 1))
+    v_ref_body = np.zeros((5, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
-        v_ref = self.velocity_reference_model.get_velocity_reference(
-          xd_prev=v_ref, 
+        v_ref_body = self.velocity_reference_model.get_body_velocity_reference(
+          xd_prev=v_ref_body, 
           v_ref_raw=self.guidance_reference_velocities,
           dt=self.dt
         )
+        v_ref_ned = self._convert_body_velocities_to_ned(np.array([v_ref_body[0], v_ref_body[1], v_ref_body[4]]))
 
         att_ref = self.controller.get_attitude_reference(
-          v_ref=v_ref,
+          v_ref=v_ref_body,
           v=self.velocities, 
           ts=self.velocities_timestamp
         )
         att_ref = self._prevent_underflow(att_ref)
 
-        att_ref_3D = np.array([att_ref[0], -att_ref[1], 0, v_ref[4]], dtype=np.float64) 
+        att_ref_3D = np.array([att_ref[0], -att_ref[1], 0, v_ref_ned[2]], dtype=np.float64) 
         attitude_cmd_msg.header.stamp = rospy.Time.now()
         attitude_cmd_msg.roll = att_ref_3D[0]   
         attitude_cmd_msg.pitch = att_ref_3D[1]
@@ -173,7 +198,7 @@ class VelocityController():
 
       else:
         self.guidance_reference_velocities = np.zeros((3, 1))
-        v_ref = np.zeros((5, 1))
+        v_ref_body = np.zeros((5, 1))
       
       self.rate.sleep()
 

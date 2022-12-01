@@ -61,7 +61,7 @@ class PID(GenericController):
       ts    : float
     ) -> np.ndarray:
 
-    error = (-v[:2] + v_ref[:2].T).reshape((2, ))
+    error = (-v[:2] + v_ref[:2].T).reshape((2))
 
     error_surge = error[0]
     error_sway = error[1]

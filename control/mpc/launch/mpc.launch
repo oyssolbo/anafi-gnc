@@ -1,7 +1,10 @@
 <launch>
 
-	<arg name="use_ned_pos_from_gnss" default="false" /> 
+	<arg name="use_optical_flow_as_feedback" default="false"/>  <!-- true -> Using velocity estimates from optical_flow. false -> Using polled velocity estimates -->
+	<arg name="use_ned_pos_from_gnss" default="false" />        <!-- true -> Use RAW estimates in NED-position directly from the bridge -->
+
 	<param name="use_ned_pos_from_gnss" type="bool" value="$(arg use_ned_pos_from_gnss)" />
+	<param name="use_optical_flow_as_feedback" type="bool" value="$(arg use_optical_flow_as_feedback)" />
 
   <node
     name="mpc"
