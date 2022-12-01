@@ -20,7 +20,7 @@ class ModelPredictiveController():
 
     # Initializing node
     rospy.init_node("mpc_node")
-    node_rate = rospy.get_param("~node_rate", default = 20)
+    node_rate = rospy.get_param("~node_rate", default=20)
     self.dt = 1.0 / node_rate 
     self.rate = rospy.Rate(node_rate)
 

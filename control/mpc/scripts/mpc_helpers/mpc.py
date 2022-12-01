@@ -224,8 +224,8 @@ class MPCSolver():
                                               5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0
                                             ]
     
-    mpc_solver.bounds['lower', '_u', 'u'] = [-5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0, -0.15]
-    mpc_solver.bounds['upper', '_u', 'u'] = [5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0, 0.15]
+    mpc_solver.bounds['lower', '_u', 'u'] = [-5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0, -0.2]
+    mpc_solver.bounds['upper', '_u', 'u'] = [5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0, 0.2]
 
     mpc_solver.setup()
 

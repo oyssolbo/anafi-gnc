@@ -1,0 +1,9 @@
+<launch>
+    <node
+        name="emulate_moving_platform"
+        pkg="emulate_moving_platform"
+        type="generate_platform_movement.py"
+        output="screen">
+    </node>
+    <rosparam command="load" file="$(find emulate_moving_platform)/config/config.yaml" />
+</launch>
