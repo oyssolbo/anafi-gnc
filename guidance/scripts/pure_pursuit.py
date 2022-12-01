@@ -44,6 +44,7 @@ class PurePursuitGuidanceLaw():
     self.desired_altitude : float = -1.0
 
     self.position_timestamp : std_msgs.msg.Time = None
+    self.attitude_timestamp : std_msgs.msg.Time = None
 
     self.desired_position : np.ndarray = None  # [xd, yd, zd]
     self.position : np.ndarray = None 
@@ -122,7 +123,7 @@ class PurePursuitGuidanceLaw():
         value: float, 
         limits: tuple
       ) -> float:
-    return np.min([np.max([value, limits[0]]), limits[1]])
+    return np.min([np.max([value, limits[0]]), limits[1]]) 
 
 
   def _get_valid_pos_error(self) -> np.ndarray:
@@ -136,9 +137,22 @@ class PurePursuitGuidanceLaw():
     # target_position = np.array([0, 0, 0.25]).reshape((3, 1))
     # error = -self.position #- target_position
     # altitude_error = (self.desired_altitude + self.position[2]) 
-    if np.linalg.norm(self.position[:2]) >= 0.2 and np.abs(self.position[2]) < 1.0:
-      altitude_error = 0
-    return np.array([self.position[0], self.position[1], altitude_error])
+    # if np.linalg.norm(self.position[:2]) >= 0.2 and np.abs(self.position[2]) < 1.0:
+    #   altitude_error = 0
+    # else:
+    #   altitude_error = self.position[2]
+    """
+    The code above caused the following exception, due to Kappa suddenly becoming an array...
+
+    The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+    [[array([0.29948186]) array([0.72824327]) 0.0]
+    [array([0.29948186]) array([0.72824327]) 0.0]
+    [array([0.29948186]) array([0.72824327]) 0.0]]
+
+    Why tf does it suddenly get into a matrix??
+    Fuck python is such a terrible language...
+    """
+    return np.array([self.position[0], self.position[1], self.position[2]], dtype=np.float)
 
 
   def calculate_velocity_reference(self) -> None:
@@ -170,7 +184,7 @@ class PurePursuitGuidanceLaw():
         kappa = (pos_error_normed * self.ua_max) / (np.sqrt(pos_error_normed + self.lookahead**2))
         vel_ref_unclamped = vel_target - (kappa * pos_error) / (pos_error_normed) 
       else:
-        vel_ref_unclamped = zeros_3_1
+        vel_ref_unclamped = np.zeros((3, 1)).ravel()
 
       vel_ref_x = self._clamp(vel_ref_unclamped[0], self.vx_limits)
       vel_ref_y = self._clamp(vel_ref_unclamped[1], self.vy_limits)

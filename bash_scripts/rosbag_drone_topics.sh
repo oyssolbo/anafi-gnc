@@ -64,6 +64,9 @@ ESTIMATE_TOPICS="\
         /estimate/ekf \
         /estimate/tcv/pose"
 
+EMULATION_TOPICS="\
+        /emulation/platform_position_ned"
+
 QUAlISYS_TOPICS="\
         /qualisys/Anafi/odom \
         /qualisys/Anafi/pose \
@@ -88,7 +91,8 @@ STANDARD_TOPICS="\
 if [[ $ENV == "sim" ]]; then
     echo "Rosbagging sim topics"
     rosbag record -O $OUTPUT_DIR/$TIME \
-        $STANDARD_TOPICS 
+        $STANDARD_TOPICS \
+        $EMULATION_TOPICS
 elif [[ $ENV == "lab" ]]; then
     echo "Rosbagging lab topics"
     rosbag record -O $OUTPUT_DIR/$TIME \

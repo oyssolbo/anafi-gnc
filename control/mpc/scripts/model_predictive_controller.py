@@ -19,11 +19,9 @@ class ModelPredictiveController():
   def __init__(self) -> None:
 
     # Initializing node
-    node_name = rospy.get_param("~node_name", default = "mpc_node")
-    node_rate = rospy.get_param("~node_rate", default = 20)
+    rospy.init_node("mpc_node")
+    node_rate = rospy.get_param("~node_rate", default=20)
     self.dt = 1.0 / node_rate 
-
-    rospy.init_node(node_name)
     self.rate = rospy.Rate(node_rate)
 
     # Setting up the controller
@@ -35,8 +33,9 @@ class ModelPredictiveController():
     self.nu = self.mpc_parameters["tuning_parameters"]["nu"]
     self.m = self.mpc_parameters["tuning_parameters"]["m"]
 
-    self.velocities : np.ndarray = np.zeros((3, 1))
-    self.position : np.ndarray = np.zeros((3, 1))
+    self.velocities_body : np.ndarray = np.zeros((3, 1))
+    self.position_body : np.ndarray = np.zeros((3, 1))
+    self.integrated_horizontal_position_body : np.ndarray = np.zeros((2, 1))
     self.attitude_rpy : np.ndarray = np.zeros((3, 1))
 
     self.velocities_timestamp : std_msgs.msg.Time = None
@@ -51,7 +50,7 @@ class ModelPredictiveController():
     rospy.Service("/mpc/service/enable_controller", SetBool, self._enable_controller)
 
     # Setup subscribers 
-    self.use_optical_flow_velocities : bool = rospy.get_param("~use_optical_flow_velocities", default = False)
+    self.use_optical_flow_velocities : bool = rospy.get_param("~use_optical_flow_velocities", default=False)
     if self.use_optical_flow_velocities:
       rospy.loginfo("Node using optical flow velocity estimates as feedback")
       rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self._optical_flow_velocities_cb)
@@ -59,7 +58,7 @@ class ModelPredictiveController():
       rospy.loginfo("Node using polled velocity estimates as feedback")
       rospy.Subscriber("/anafi/polled_body_velocities", TwistStamped, self._polled_velocities_cb)
 
-    self.use_ned_pos_from_gnss : bool = rospy.get_param("/use_ned_pos_from_gnss")
+    self.use_ned_pos_from_gnss : bool = rospy.get_param("/use_ned_pos_from_gnss", default=False)
     if self.use_ned_pos_from_gnss:
       rospy.loginfo("Node using position estimates from GNSS. Estimates from EKF disabled")
       rospy.Subscriber("/anafi/ned_pos_from_gnss", PointStamped, self._ned_pos_cb)
@@ -95,7 +94,7 @@ class ModelPredictiveController():
       return
     
     self.velocities_timestamp = msg_timestamp
-    self.velocities = np.array([msg.vector.x, msg.vector.y, msg.vector.z]).reshape((3, 1))
+    self.velocities_body = np.array([msg.vector.x, msg.vector.y, msg.vector.z]).reshape((3, 1))
 
 
   def _polled_velocities_cb(self, msg : TwistStamped) -> None:
@@ -106,7 +105,7 @@ class ModelPredictiveController():
       return
     
     self.velocities_timestamp = msg_timestamp     
-    self.velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).reshape((3, 1))
+    self.velocities_body = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).reshape((3, 1))
 
 
   def _ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
@@ -117,7 +116,7 @@ class ModelPredictiveController():
       return
     
     self.position_timestamp = msg_timestamp
-    self.position = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
+    self.position_body = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
 
 
   def _ned_pos_cb(self, msg : PointStamped) -> None:
@@ -127,16 +126,13 @@ class ModelPredictiveController():
       # Old message
       return
 
+    self.position_timestamp = msg_timestamp
     if self.last_rotation_matrix_body_to_vehicle is None:
       # Impossible to convert positions to body frame
       return
     
-    # The MPC-solver has the equations for position implemented in NED, but due to the assumption 
-    # that yaw could be neglected, the positions are technically given in body. This means that one must know
-    # the yaw angle to convert correctly
-    # Luckily in the simulator, this is known exactly
-    self.position_timestamp = msg_timestamp
-    self.position = self.last_rotation_matrix_body_to_vehicle.T @ np.array([msg.point.x, msg.point.y, msg.point.z], dtype=float).reshape((3, 1)) 
+    # Converting from NED origin-to-drone position to Body drone-to-origin position  
+    self.position_body = self.last_rotation_matrix_body_to_vehicle.T @ np.array([msg.point.x, msg.point.y, msg.point.z], dtype=float).reshape((3, 1)) 
 
 
   def _attitude_cb(self, msg : QuaternionStamped) -> None:
@@ -151,14 +147,55 @@ class ModelPredictiveController():
     self.attitude_rpy = rotation.as_euler('xyz', degrees=False).reshape((3, 1))
     self.last_rotation_matrix_body_to_vehicle = rotation.as_matrix()
 
+
+  def _convert_body_array_to_ned(
+        self, 
+        arr : np.ndarray
+      ) -> np.ndarray:
+    """
+    Obs: Future improvement to use tf2 instead of manually converting these
+    measurements 
+    """
+    return (self.last_rotation_matrix_body_to_vehicle @ arr)
+
   
   def _get_current_state_estimate(self) -> np.ndarray:
-    if  self.position_timestamp is None or self.velocities_timestamp is None or self.attitude_timestamp is None:
+    if self.position_timestamp is None or self.velocities_timestamp is None or self.attitude_timestamp is None:
+      error_msg = "\nNot enough feedback data to solve the optimization problem:\n"
+      if self.position_timestamp is None:
+        error_msg += "Missing position estimates\n"
+
+      if self.velocities_timestamp is None:
+        error_msg += "Missing velocity estimates\n"
+
+      if self.attitude_timestamp is None:
+        error_msg += "Missing attitude estimates\n"
+
+      error_msg += "Trying to hover\n"
+      rospy.logerr_throttle(1, error_msg)
       return np.zeros((self.nx, self.m))
     
+    # Performed worse if included
+    # Thory that this is caused by the heave velocity not being in body as I 
+    # originally thought, but in the topographic frame 
+    # Therefore makes little sence to have this restricted to the horizontal error in body
+    horizontal_position_normed = np.linalg.norm(self.position_body[:2])
+    if horizontal_position_normed > 0.5:
+      # Maintain the altitude until close enough
+      self.position_body[2] = 0
+
+    # if np.linalg.norm(self.integrated_horizontal_position_body) < 5:
+    #   self.integrated_horizontal_position_body = self.integrated_horizontal_position_body + self.dt * self.position_body[:2]
+    # print(self.integrated_horizontal_position_body)
+
+    # Theory that the values are updated and affecting the values used in the 
+    # MPC, since everything in python are references
     return np.vstack(
       [
-        self.position,
+        # self.integrated_horizontal_position_body.copy(),
+        self.position_body,
+        self._convert_body_array_to_ned(self.velocities_body)[:2],  # Simplest to use ned-velocities as input. 
+                                                                    # Only giving the horizontal velocities as input  
         self.attitude_rpy
       ]
     )
@@ -170,7 +207,7 @@ class ModelPredictiveController():
       ) -> np.ndarray:
     """
     Preventing underflow to setting all values with an absolute value below
-    @p min_value to 0. It assumes that 
+    @p min_value to 0 
     """
     with np.nditer(arr, op_flags=['readwrite']) as iterator:
       for val in iterator:

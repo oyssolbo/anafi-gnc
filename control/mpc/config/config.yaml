@@ -1,12 +1,4 @@
-node_name: "mpc_node"
 node_rate: 20
-
-attitude_limits:
-  pitch: [-5, 5]  # deg
-  roll: [-5, 5]   # deg
-
-use_optical_flow_velocities: false  # true -> Using velocity estimates from optical_flow
-                                    # false -> Using polled velocity estimates 
 
 mpc_config:
   system_parameters:
@@ -28,31 +20,32 @@ mpc_config:
     gravitational_acceleration: 9.82179 # [m/s²] - for Trondheim at sea level
     
   tuning_parameters:
-    nx: 9 # 10 - could add integral action for x,y,z and drop the state estimates for heave and yaw 
+    nx: 8 
     nu: 4
-    m: 1
+    m:  1
 
     objective_function:
-      q_diagonal: [2, 2, 1.5, 1.25, 1.25, 1, 0.5, 0.5, 0.001]
-      r_diagonal: [1, 1, 0, 1]
-    
-    # slack_constraints: [0, 0, 0] 
+      # States:    x  y  z  u     v     phi   theta psi  
+      q_diagonal: [1, 1, 1, 0.25, 0.25, 0.25, 0.25, 0.01]
 
-    # bounds:
-    #   x:
-    #     lb: [-inf, -inf, -inf, -2, -2, -0.1, -10*np.pi/180.0, -10*np.pi/180.0, -inf]
-    #     ub: [inf, inf, inf, 2, 2, 0.1, 10*np.pi/180.0, 10*np.pi/180.0, inf]
-    #   u:
-    #     lb: [-10*np.pi/180.0, -10*np.pi/180.0, -25*np.pi/180.0, -1.0]
-    #     ub: [10*np.pi/180.0, 10*np.pi/180.0, 25*np.pi/180.0, 1.0]
-      
+      # Control:   phi_ref, theta_ref, r_ref, thrust_ref
+      r_diagonal: [2,       2,         0,     1]                                      
     
-    prediction_horizon: 10
-    robust_horizon: 0
-    time_step: 0.02          # [s] 
+    prediction_horizon: 12 # Not more than 15 - otherwise too aggressive
+    robust_horizon:     0
+    time_step:          0.05  # [s] 
+
+    # Should add the constraints here - future revision
+    constraints:
+      x:
+        lb: [-inf, -inf, -100, -4, -4, -5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0]
+        ub: [inf, inf, 0.5, 4, 4, 5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0]
+      u:
+        lb: [-5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0, -0.15]
+        ub: [5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0, 0.15]
 
   solving_parameters:
     collocation_degree: 2
     solver_options:
-      solver: "MA57"  # MA57 is recommended, https://www.hsl.rl.ac.uk/ipopt/
-      debug_level: 0
+      solver: "mumps"  # MA57 is recommended, https://www.hsl.rl.ac.uk/ipopt/, but some installation is broken
+      debug_level: 1

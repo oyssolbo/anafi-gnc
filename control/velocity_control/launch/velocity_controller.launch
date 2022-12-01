@@ -1,4 +1,13 @@
 <launch>
+
+	<arg name="use_optical_flow_as_feedback" default="false"/>  <!-- true -> Using velocity estimates from optical_flow. false -> Using polled velocity estimates -->
+  <arg name="use_pure_pursuit_guidance" default="false"/>     <!-- true -> Using pure pursuit guidance to generate the velocity reference. false -> Using PID-guidance to generate the velocity reference -->
+  <arg name="controller" default="pid"/>    <!-- pid, ipid -->
+
+	<param name="use_optical_flow_as_feedback" type="bool" value="$(arg use_optical_flow_as_feedback)" />
+	<param name="use_pure_pursuit_guidance" type="bool" value="$(arg use_pure_pursuit_guidance)" />
+  <param name="controller" type="string" value="$(arg controller)" />
+
   <node
     name="velocity_control"
     pkg="velocity_control"
