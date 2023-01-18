@@ -78,7 +78,8 @@ QUAlISYS_TOPICS="\
 
 GNC_TOPICS="\
         /guidance/pure_pursuit/velocity_reference \
-        /guidance/pid/velocity_reference"
+        /guidance/pid/velocity_reference \
+        /ipid/delta_hat"
 
 STANDARD_TOPICS="\
         $ANAFI_OUTPUT_TOPICS \

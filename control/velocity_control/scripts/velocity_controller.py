@@ -13,6 +13,7 @@ from geometry_msgs.msg import TwistStamped, Vector3Stamped, QuaternionStamped
 from olympe_bridge.msg import AttitudeCommand
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 from scipy.spatial.transform import Rotation
+from std_msgs.msg import Float64MultiArray, MultiArrayLayout, MultiArrayDimension
 
 np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
 
@@ -73,6 +74,7 @@ class VelocityController():
 
     # Setup publishers
     self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
+    self.ipid_delta_hat_pub = rospy.Publisher("/ipid/delta_hat", Float64MultiArray, queue_size=1)
 
     # Initial values
     self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
@@ -170,6 +172,9 @@ class VelocityController():
   def publish_attitude_ref(self) -> None:
     attitude_cmd_msg = AttitudeCommand()
 
+    delta_hat_msg = Float64MultiArray()
+    delta_hat_msg.layout = MultiArrayLayout()
+
     v_ref_body = np.zeros((5, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
@@ -195,6 +200,11 @@ class VelocityController():
         attitude_cmd_msg.gaz = att_ref_3D[3]
 
         self.attitude_ref_pub.publish(attitude_cmd_msg)
+
+        # Publish current adaptive estimates in roll and pitch
+        delta_hat = self.controller.get_delta_hat()
+        delta_hat_msg.data = [delta_hat[0], delta_hat[1]]
+        self.ipid_delta_hat_pub.publish(delta_hat_msg)
 
       else:
         self.guidance_reference_velocities = np.zeros((3, 1))
