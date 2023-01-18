@@ -22,6 +22,9 @@ class GenericController():
   def _clamp(self, value: float, limits: tuple) -> float:
     return np.min([np.max([value, limits[0]]), limits[1]])
 
+  def get_delta_hat(self) -> tuple:
+    return (0, 0)
+
 
 class PID(GenericController):
   def __init__(self, params: dict, limits: dict):
@@ -60,8 +63,11 @@ class PID(GenericController):
       v     : np.ndarray, 
       ts    : float
     ) -> np.ndarray:
-
-    error = (-v[:2] + v_ref[:2].T).reshape((2))
+    # print(-v[:2] + v_ref[:2].T)
+    print(v.ravel())
+    print(v_ref.ravel())
+    print()
+    error = (-v.ravel()[:2] + v_ref.ravel()[:2].T).reshape((2))
 
     error_surge = error[0]
     error_sway = error[1]
@@ -229,8 +235,8 @@ class iPID(GenericController):
     pid_pitch = self.Kp_x * error_surge + self.Kd_x * error_surge_dot + self.Ki_x * self.error_int[0]
     pid_roll = self.Kp_y * error_sway + self.Kd_y * error_sway_dot + self.Ki_y * self.error_int[1]
 
-    adaptive_pitch_ref = surge_dot_ref + pid_pitch - self.delta_hat_pitch #(surge_dot_ref + pid_pitch - self.delta_hat_pitch)
-    adaptive_roll_ref = sway_dot_ref + pid_roll - self.delta_hat_roll #(sway_dot_ref + pid_roll - self.delta_hat_roll)
+    adaptive_pitch_ref = -surge_dot_ref + pid_pitch - self.delta_hat_pitch #(surge_dot_ref + pid_pitch - self.delta_hat_pitch)
+    adaptive_roll_ref = -sway_dot_ref + pid_roll - self.delta_hat_roll #(sway_dot_ref + pid_roll - self.delta_hat_roll)
 
     adaptive_pitch_ref = self._clamp(adaptive_pitch_ref, self.pitch_limits)
     adaptive_roll_ref = self._clamp(adaptive_roll_ref, self.roll_limits)
@@ -243,6 +249,9 @@ class iPID(GenericController):
     delta_hat_pitch_dot = -self.delta_hat_pitch + gamma * error_surge
     delta_hat_roll_dot = -self.delta_hat_roll + gamma * error_sway 
 
+    delta_hat_pitch_dot = gamma * error_surge
+    delta_hat_roll_dot = gamma * error_sway 
+
     self.delta_hat_pitch = self.delta_hat_pitch + dt * delta_hat_pitch_dot 
     self.delta_hat_roll = self.delta_hat_roll + dt * delta_hat_roll_dot
 
@@ -250,3 +259,6 @@ class iPID(GenericController):
     self.prev_ts = ts
 
     return attitude_reference
+
+  def get_delta_hat(self) -> tuple:
+    return (self.delta_hat_roll, self.delta_hat_pitch)

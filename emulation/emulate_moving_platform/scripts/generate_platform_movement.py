@@ -16,7 +16,7 @@ class EmulateMovingPlatform():
     self.rate = rospy.Rate(node_rate)
 
     # Initialize private variables
-    self.anafi_position_ned : np.ndarray = np.zeros((3, 1))
+    self.anafi_position_ned : np.ndarray = np.zeros((3))
     self.last_rotation_matrix_body_to_vehicle : np.ndarray = None
 
     # Set up publishers
@@ -33,6 +33,7 @@ class EmulateMovingPlatform():
     self.attitude_rpy = rotation.as_euler('xyz', degrees=False).reshape((3, 1))
     self.last_rotation_matrix_body_to_vehicle = rotation.as_matrix()
 
+
   def _anafi_ned_pos_cb(self, msg : PointStamped) -> None:
     if self.last_rotation_matrix_body_to_vehicle is None:
       # Impossible to convert positions to body frame
@@ -48,7 +49,7 @@ class EmulateMovingPlatform():
     
     deg_to_rad : float = np.pi / 180.0
 
-    U : float = 0.5   # [m/s] Absolute value
+    U : float = 0.25   # [m/s] Absolute value
     wave_height : float = 0.1
 
     K_z : float = 0.5  # Frequency of 0.1 rad
@@ -56,7 +57,7 @@ class EmulateMovingPlatform():
     T_r : float = 1
     K_r : float = 1
 
-    mu_dot_std : float = 0.1
+    mu_dot_std : float = 0.15
 
     delta_min : float = -15 * deg_to_rad
     delta_max : float = 15 * deg_to_rad
@@ -64,7 +65,7 @@ class EmulateMovingPlatform():
 
     t : float = 0 
 
-    pos_ned : np.ndarray = np.zeros((3, 1))
+    pos_ned : np.ndarray = np.array([0, 0, -2]).reshape((3,1))
     vel_body : np.ndarray = np.array([U, 0, 0]) 
     psi : float = 0
     r : float = 0
@@ -92,10 +93,14 @@ class EmulateMovingPlatform():
       # Calculate the positional error in body frame
       if not self.last_rotation_matrix_body_to_vehicle is None:
         position_diff_ned : np.ndarray = pos_ned - self.anafi_position_ned
-        position_diff_body : np.ndarray = self.last_rotation_matrix_body_to_vehicle.T @ position_diff_ned
+        position_diff_body : np.ndarray = self.last_rotation_matrix_body_to_vehicle.T @ position_diff_ned[:]
       else:
         rospy.logwarn_throttle(1, "Unable to acquire attitude estimates from the Anafi")
-        position_diff_body : np.ndarray = np.zeros((3, 1))
+        position_diff_body : np.ndarray = np.zeros((3))
+
+      # print(pos_ned)
+      # print(position_diff_body)
+      # print()
 
       # Publish the data
       position_error_body_msg = PointWithCovarianceStamped()

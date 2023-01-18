@@ -80,6 +80,10 @@ class MPCSolver():
         x : casadi.SX, 
         u : casadi.SX
       ) -> casadi.SX:
+    """
+    x = [x^n, y^n, z^n, ]
+    """
+
     # Standard MPC - corrected the heave-velocity measurements which was previously thought 
     # to be in Body, and not in NED...
 
@@ -136,10 +140,10 @@ class MPCSolver():
     velocity_body = rotation_matrix_body_to_vehicle @ velocity_ned
 
     # Derivatives
-    d_position_body = velocity_body
+    d_position_ned = velocity_ned
 
-    d_horizontal_vel = np.eye(2, 3) @ (
-      ((rotation_matrix_vehicle_to_body @ self.g_ned) - self.linear_drag_matrix @ velocity_body) / (self.drone_mass)
+    d_velocity_body = (
+      (rotation_matrix_vehicle_to_body @ self.g_ned) - (self.linear_drag_matrix @ velocity_body) / (self.drone_mass)
     )
 
     d_rpy = np.array(
@@ -149,7 +153,25 @@ class MPCSolver():
         [0]#[u[2]]
       ]
     )
-    return casadi.vertcat(*[d_position_body, d_horizontal_vel, d_rpy])
+
+    # Estimating the derivative in NED-velocity
+    d_roll = d_rpy[0]
+    d_pitch = d_rpy[1]
+    d_yaw = d_rpy[2]
+
+    d_rot_mat = np.eye(3) + np.array(
+      [
+        [0, -d_yaw, d_pitch],
+        [d_yaw, 0, -d_roll],
+        [-d_pitch, d_roll, 0]
+      ]
+    )
+
+    d_horizontal_vel_ned = np.ones((2, 3)) @ (
+      rotation_matrix_body_to_vehicle @ d_velocity_body + d_rot_mat @ velocity_body
+    )
+
+    return casadi.vertcat(*[d_position_ned, d_horizontal_vel_ned, d_rpy])
 
 
   def _setup_model(self) -> None:
@@ -216,12 +238,12 @@ class MPCSolver():
     mpc_solver.bounds['lower', '_x', 'x'] = [\
                                               -inf, -inf, -100, \
                                               -4, -4, \
-                                              -5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0
+                                              -5*np.pi/180.0, -5*np.pi/180.0, -inf
                                             ]
     mpc_solver.bounds['upper', '_x', 'x'] = [\
                                               inf, inf, 0.5, \
                                               4, 4, \
-                                              5*np.pi/180.0, 5*np.pi/180.0, 10*np.pi/180.0
+                                              5*np.pi/180.0, 5*np.pi/180.0, inf
                                             ]
     
     mpc_solver.bounds['lower', '_u', 'u'] = [-5*np.pi/180.0, -5*np.pi/180.0, -10*np.pi/180.0, -0.2]
