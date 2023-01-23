@@ -23,7 +23,7 @@ class VelocityController():
   def __init__(self) -> None:
 
     # Initializing node
-    rospy.init_node("attitude_controller_node")
+    rospy.init_node("velocity controller_node")
     node_rate = rospy.get_param("~node_rate")
     self.dt = 1.0 / node_rate 
     self.rate = rospy.Rate(node_rate)
@@ -51,23 +51,27 @@ class VelocityController():
     )
 
     # Setup services
-    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller)
+    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller_srv)
 
     # Setup subscribers 
     self.use_optical_flow_as_feedback : bool = rospy.get_param("/use_optical_flow_as_feedback")
     if self.use_optical_flow_as_feedback:
-      rospy.loginfo("Node using optical flow velocity estimates as feedback")
+      rospy.loginfo("Velocity controller using optical flow velocity estimates as feedback")
       rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self._optical_flow_velocities_cb)
     else:
-      rospy.loginfo("Node using polled velocity estimates as feedback")
+      rospy.loginfo("Velocity controller using polled velocity estimates as feedback")
       rospy.Subscriber("/anafi/polled_body_velocities", TwistStamped, self._polled_velocities_cb)
 
-    use_pure_pursuit_guidance : bool = rospy.get_param("/use_pure_pursuit_guidance")
+    # Possibility to use both pure-pursuit and PID-guidance. The project-thesis shows that these are
+    # really similar, as long as one is actually able to use the correct formula (which M. Falang was
+    # not able to, and therefore got skewed results). The code leaves up to change the guidance module,
+    # but the pure-pursuit is used as default. Will currently crash if default-value is removed 
+    use_pure_pursuit_guidance : bool = rospy.get_param("/use_pure_pursuit_guidance", default=True)
     if use_pure_pursuit_guidance:
-      rospy.loginfo("Node using pure pursuit guidance as velocity reference")
+      rospy.loginfo("Velocity controller using pure pursuit guidance as velocity reference")
       rospy.Subscriber("/guidance/pure_pursuit/velocity_reference", TwistStamped, self._reference_velocities_cb)
     else:
-      rospy.loginfo("Node using PID-based guidance as velocity reference")
+      rospy.loginfo("Velocity controller using PID-based guidance as velocity reference")
       rospy.Subscriber("/guidance/pid/velocity_reference", TwistStamped, self._reference_velocities_cb)
 
     rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
@@ -88,6 +92,15 @@ class VelocityController():
     self.is_controller_active : bool = False
 
 
+  def _enable_controller_srv(self, msg : SetBoolRequest) -> SetBoolResponse:
+    self.is_controller_active = msg.data
+
+    res = SetBoolResponse()
+    res.success = True
+    res.message = "" 
+    return res 
+
+
   def _reference_velocities_cb(self, msg : TwistStamped) -> None:
     msg_timestamp = msg.header.stamp
 
@@ -97,15 +110,6 @@ class VelocityController():
 
     self.guidance_timestamp = msg_timestamp
     self.guidance_reference_velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
-
-
-  def _enable_controller(self, msg : SetBoolRequest) -> SetBoolResponse:
-    self.is_controller_active = msg.data
-
-    res = SetBoolResponse()
-    res.success = True
-    res.message = "" 
-    return res 
 
 
   def _polled_velocities_cb(self, msg : TwistStamped) -> None:
