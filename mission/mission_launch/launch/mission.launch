@@ -1,8 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-
-  <!-- Mission nodes -->
-  <include file="$(find mission_planning)/launch/mission_planner.launch" pass_all_args="true"/>
-  <include file="$(find mission_execution)/launch/mission_executor.launch" pass_all_args="true"/>
-
-</launch>
