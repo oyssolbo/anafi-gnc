@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 
-	<arg name="control_method" default="mpc" /> 
+	<arg name="control_method" default="pid" /> 
 	<param name="control_method" type="string" value="$(arg control_method)" />
 
   <node
