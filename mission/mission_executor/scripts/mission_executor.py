@@ -24,11 +24,14 @@ import simple_missions.lab_test as lab_test
 
 class MissionExecutorNode():
   """
-  What is left to do (except for the documentation):
+  TODO
+  - Documentation
+  - Incorporate the module better with the mission planner
   - store information when an action or service fails to perform some operation, and
     find a method for solving this. Must likely be passed to the planner
   - usage of config file for storing topics/actions/services etc
-  - finding a method for passing locations 
+  - finding a method for passing locations
+  - be able to perform actions in parallel 
   """
   def __init__(self) -> None:
     # Setup node
@@ -162,8 +165,7 @@ class MissionExecutorNode():
 
 
   def _get_action_data(self):
-    if self.actions_list is None \
-      or not self.actions_list:
+    if self.actions_list is None or not self.actions_list:
 
       self.action_str = "idle"
       self.action_movement = np.zeros((4, 1))
@@ -203,7 +205,7 @@ class MissionExecutorNode():
       return self._communicate
     if self.action_str == "travel_to":
       rospy.loginfo("Next action: Travel to")
-      return self._travel_to 
+      return self._communicate 
     if self.action_str == "move_relative":
       rospy.loginfo("Next action: Move relative")
       return self._move_relative
@@ -505,6 +507,168 @@ class MissionExecutorNode():
     return np.zeros((3, 1))
 
 
+  def _check_landing_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    return self._check_drone_state(
+      desired_state="FS_LANDED",
+      start_time=start_time,
+      current_count=current_count,
+      min_count=2,
+      max_wait_time=self.max_expected_action_time_s
+    )
+
+
+  def _check_takeoff_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    return self._check_drone_state(
+      desired_state="FS_HOVERING",
+      start_time=start_time,
+      current_count=current_count,
+      min_count=5,
+      max_wait_time=self.max_expected_action_time_s
+    )
+
+
+  def _check_search_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    # Must get an update from the perception-module whether the object of interest has been detected
+    searched_current_position = self._search_positions()
+
+    is_object_found = False # Unsure how to use this information as of now...
+                            # Currently just assuming that the search will stop if found anything, however
+                            # it may be better to continue the search afterwards 
+
+    is_search_finished = (searched_current_position and self.search_points_ned.size == 0) or is_object_found
+
+    return (is_search_finished, (rospy.Time.now() - start_time).to_sec() >= self.max_expected_action_time_s, 0)
+
+
+  def _check_track_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    # Check that the error is small enough
+    if self.pos_relative_to_helipad is None:
+      # No input from the EKF received
+      rospy.logerr("EKF does not appear to be running. Exiting tracking-action")
+      return (True, False, 0)
+
+    # TODO: Add a position above the landing pad to achieve before landing
+    horizontal_pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad[:2])
+    vertical_pos_error = self.pos_relative_to_helipad[2]
+    
+    horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.05)
+    vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.6)  # Anafi cannot be controlled lower than 0.5 m above helipad in vertical direction
+                                                                                                    # Note that the horizontal position can be controlled when the 'land' action is called
+
+    # Check whether the drone is close enough to the helipad
+    is_drone_close_to_helipad = (
+      (horizontal_pos_error_normed < horizontal_tracking_error_limit) 
+      and 
+      (np.abs(vertical_pos_error) < vertical_tracking_error_limit) 
+    )
+
+    # Check whether the horizontal velocity is low enough, such that it does not try
+    # to land if it suddenly gets high velocities in one direction
+    # One might consider using the attitude, but that might cause problems if the drone 
+    # must counteract disturbances from e.g. wind 
+    is_velocity_low_enough = True # TODO
+
+    is_drone_ready_to_land = (is_drone_close_to_helipad and is_velocity_low_enough)
+
+    if is_drone_ready_to_land:
+      current_count += 1
+    else:
+      current_count = 0
+
+    return (is_drone_ready_to_land and current_count >= 3, False, current_count) 
+
+
+  def _check_communicate_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    return (True, False, 0) 
+
+
+  def _check_drop_bouy_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    return (True, False, 0)
+
+
+  def _check_travel_to_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    # Check whether the drone is close enough to the desired point of interest
+    # May become slightly problematic when travelling to the platform, as the error might be 
+    # too large for the tracking to handle
+
+    # This function is currently intended for moving with respect to a larger area
+    horizontal_radius_of_acceptance = rospy.get_param("~horizontal_radius_of_acceptance", default=1.0)
+    vertical_radius_of_acceptance = rospy.get_param("~vertical_radius_of_acceptance", default=2.0)
+    
+    if self.desired_ned_pos is None:
+      rospy.logerr_throttle(1, "[_check_current_action_finished()] Desired NED position isre None")
+      return (False, False, 0)
+
+    pos_error_ned = self.desired_ned_pos - self.pos_ned_gnss
+    return np.linalg.norm(pos_error_ned[:2]) <= horizontal_radius_of_acceptance \
+            and np.abs(pos_error_ned) <= vertical_radius_of_acceptance
+
+
+
+  def _check_move_relative_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    # This might return to quickly if not checking that it has been flying
+    # Edge-case in case relative movement is zero
+    # But at the same time, 5 counts may be enough...
+    # if self.prev_drone_state != "FS_FLYING":
+    #   return (False, False, 0)
+    return self._check_drone_state(
+      desired_state="FS_HOVERING",
+      start_time=start_time,
+      current_count=current_count,
+      min_count=5,
+      max_wait_time=self.max_expected_action_time_s
+    )
+    
+
+  def _check_hover_finished(
+        self,
+        start_time    : rospy.Time,
+        current_count : int         
+      ) -> tuple:
+    drone_state = self._check_drone_state(
+      desired_state="FS_HOVERING",
+      start_time=start_time,
+      current_count=current_count,
+      min_count=5,
+      max_wait_time=self.max_expected_action_time_s
+    )
+    if not drone_state[0]:
+      self._hover()
+    return (drone_state[0], False, drone_state[2])
+
+
   def _check_current_action_finished(
         self,
         start_time    : rospy.Time,
@@ -518,9 +682,6 @@ class MissionExecutorNode():
       - current_count: int
 
     A more stable method should be implemented
-
-    Possible flying states as output using rosecho:
-    "FS_LANDED", "FS_MOTOR_RAMPING", "FS_TAKINGOFF", "FS_HOVERING", "FS_FLYING", "FS_LANDING", "FS_EMERGENCY"
     """
 
     if self.drone_state is None:
@@ -529,127 +690,39 @@ class MissionExecutorNode():
 
 
     if self.action_str == "takeoff":
-      return self._check_drone_state(
-        desired_state="FS_HOVERING",
-        start_time=start_time,
-        current_count=current_count,
-        min_count=5,
-        max_wait_time=self.max_expected_action_time_s
-      )
+      return self._check_takeoff_finished(start_time, current_count)
 
 
     if self.action_str == "land":
-      return self._check_drone_state(
-        desired_state="FS_LANDED",
-        start_time=start_time,
-        current_count=current_count,
-        min_count=2,
-        max_wait_time=self.max_expected_action_time_s
-      )
+      return self._check_landing_finished(start_time, current_count)
 
 
     if self.action_str == "track":
-      # Check that the error is small enough
-      if self.pos_relative_to_helipad is None:
-        # No input from the EKF received
-        rospy.logerr("EKF does not appear to be running. Exiting tracking-action")
-        return (True, False, 0)
-
-      # TODO: Add a position above the landing pad to achieve before landing
-      horizontal_pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad[:2])
-      vertical_pos_error = self.pos_relative_to_helipad[2]
-      
-      horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.05)
-      vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.9) # NOTE: 0.9 for the simulator. Get this from launch-file or something
-
-      # Check whether the drone is close enough to the helipad
-      is_drone_close_to_helipad = (
-        (horizontal_pos_error_normed < horizontal_tracking_error_limit) 
-        and 
-        (np.abs(vertical_pos_error) < vertical_tracking_error_limit) 
-      )
-
-      # Check whether the horizontal velocity is low enough, such that it does not try
-      # to land if it suddenly gets high velocities in one direction
-      # One might consider using the attitude, but that might cause problems if the drone 
-      # must counteract disturbances from e.g. wind 
-      is_velocity_low_enough = True # TODO
-
-      is_drone_ready_to_land = (is_drone_close_to_helipad and is_velocity_low_enough)
-
-      if is_drone_ready_to_land:
-        current_count += 1
-      else:
-        current_count = 0
-
-      return (is_drone_ready_to_land and current_count >= 3, False, current_count) 
+      return self._check_track_finished(start_time, current_count)
 
 
     if self.action_str == "search":
-      # Must get an update from the perception-module whether the object of interest has been detected
-      searched_current_position = self._search_positions()
-
-      is_object_found = False # Unsure how to use this information as of now...
-                              # Currently just assuming that the search will stop if found anything, however
-                              # it may be better to continue the search afterwards 
-
-      is_search_finished = (searched_current_position and self.search_points_ned.size == 0) or is_object_found
-
-      return (is_search_finished, (rospy.Time.now() - start_time).to_sec() >= self.max_expected_action_time_s, 0)
+      return self._check_search_finished(start_time, current_count)
 
 
     if self.action_str == "communicate":
-      return (True, False, 0)
+      return self._check_communicate_finished(start_time, current_count)
 
 
     if self.action_str == "travel_to":
-      # Check whether the drone is close enough to the desired point of interest
-      # May become slightly problematic when travelling to the platform, as the error might be 
-      # too large for the tracking to handle
-
-      # This function is currently intended for moving with respect to a larger area
-      horizontal_radius_of_acceptance = rospy.get_param("~horizontal_radius_of_acceptance", default=1.0)
-      vertical_radius_of_acceptance = rospy.get_param("~vertical_radius_of_acceptance", default=2.0)
-      
-      if self.desired_ned_pos is None:
-        rospy.logerr_throttle(1, "[_check_current_action_finished()] Desired NED position isre None")
-        return (False, False, 0)
-
-      pos_error_ned = self.desired_ned_pos - self.pos_ned_gnss
-      return np.linalg.norm(pos_error_ned[:2]) <= horizontal_radius_of_acceptance \
-              and np.abs(pos_error_ned) <= vertical_radius_of_acceptance
+      return self._check_travel_to_finished(start_time, current_count)
 
 
     if self.action_str == "move_relative":
-      # This might return to quickly if not checking that it has been flying
-      # Edge-case in case relative movement is zero
-      # But at the same time, 5 counts may be enough...
-      # if self.prev_drone_state != "FS_FLYING":
-      #   return (False, False, 0)
-      return self._check_drone_state(
-        desired_state="FS_HOVERING",
-        start_time=start_time,
-        current_count=current_count,
-        min_count=5,
-        max_wait_time=self.max_expected_action_time_s
-      )
-    
+      return self._check_move_relative_finished(start_time, current_count)
+
 
     if self.action_str == "drop_bouy":
-      return (True, False, 0)
+      return self._check_drop_bouy_finished(start_time, current_count)
 
 
     if self.action_str == "hover":
-      drone_state = self._check_drone_state(
-        desired_state="FS_HOVERING",
-        start_time=start_time,
-        current_count=current_count,
-        min_count=5,
-        max_wait_time=self.max_expected_action_time_s
-      )
-      if not drone_state[0]:
-        self._hover()
-      return (drone_state[0], False, drone_state[2])
+      return self._check_hover_finished(start_time, current_count)
 
 
     return (False, False, 0)
