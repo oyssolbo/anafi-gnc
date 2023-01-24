@@ -1,8 +1,13 @@
 <?xml version="1.0"?>
 <launch>
 
+  <arg name="is_mission_testing" default="true" />
+  <arg name="mission_test_id" default="2" /> <!-- See simple-tests script for ids  -->
 	<arg name="control_method" default="pid" /> 
-	<param name="control_method" type="string" value="$(arg control_method)" />
+
+	<param name="is_mission_testing" type="bool" value="$(arg is_mission_testing)" /> 
+  <param name="mission_test_id" type="int" value="$(arg mission_test_id)" /> 
+  <param name="control_method" type="string" value="$(arg control_method)" />
 
   <node
     name="mission_execution"

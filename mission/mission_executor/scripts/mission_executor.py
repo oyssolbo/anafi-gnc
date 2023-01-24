@@ -79,10 +79,10 @@ class MissionExecutorNode():
     self.gnss_timestamp : rospy.Time = None
     self.ekf_timestamp : rospy.Time = None
 
-    testing_config = rospy.get_param("~testing")
-    if testing_config["is_mission_testing"]:
+    is_mission_testing = rospy.get_param("/is_mission_testing")
+    if is_mission_testing:
       self.is_mission_testing = True
-      mission_test_id = testing_config["mission_test_id"]
+      mission_test_id = rospy.get_param("/mission_test_id")
       self.actions_list = lab_test.generate_actions(mission_id=mission_test_id)
 
       rospy.loginfo("Running mission-test with test-id: {}".format(mission_test_id))
