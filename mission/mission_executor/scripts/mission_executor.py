@@ -37,29 +37,6 @@ class MissionExecutorNode():
     rospy.init_node(node_name)
     self.rate = rospy.Rate(node_rate)
 
-    # Setup subscribers
-    rospy.Subscriber("/anafi/state", std_msgs.msg.String, self._drone_state_cb) 
-    rospy.Subscriber("/anafi/ned_pose_from_gnss", geometry_msgs.msg.PointStamped, self._drone_ned_pose_from_gnss_cb)
-    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self._ekf_cb)
-
-    # Setup services
-    rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self._set_planned_actions_srv)
-
-    # Setup publishers
-    self.takeoff_pub = rospy.Publisher("/anafi/cmd_takeoff", std_msgs.msg.Empty, queue_size=1)
-    self.land_pub = rospy.Publisher("/anafi/cmd_land", std_msgs.msg.Empty, queue_size=1)
-
-    self.move_to_pub = rospy.Publisher("/anafi/cmd_moveto", olympe_bridge.msg.MoveToCommand, queue_size=1)
-    self.move_to_ned_pos_pub = rospy.Publisher("/anafi/cmd_moveto_ned_position", geometry_msgs.msg.PointStamped, queue_size=1)
-    self.move_relative_pub = rospy.Publisher("/anafi/cmd_moveby", olympe_bridge.msg.MoveByCommand, queue_size=1)
-
-    # Services and actions to connect to
-    selected_control_method = rospy.get_param("/control_method")
-    if selected_control_method == "mpc":
-      self.controller_service_name = "/mpc/service/enable_controller"
-    else:
-      self.controller_service_name = "/velocity_controller/service/enable_controller"
-
     # Initializing values
     self.pos_ned_gnss : np.ndarray = None 
     self.expected_platform_ned_pos : np.ndarray = None       
@@ -88,6 +65,31 @@ class MissionExecutorNode():
       rospy.loginfo("Running mission-test with test-id: {}".format(mission_test_id))
     else:
       self.is_mission_testing = False 
+      self.actions_list = []
+
+    # Services and actions to connect to
+    selected_control_method = rospy.get_param("/control_method")
+    if selected_control_method == "mpc":
+      self.controller_service_name = "/mpc/service/enable_controller"
+    else:
+      self.controller_service_name = "/velocity_controller/service/enable_controller"
+
+    # Setup subscribers
+    rospy.Subscriber("/anafi/state", std_msgs.msg.String, self._drone_state_cb) 
+    rospy.Subscriber("/anafi/ned_pose_from_gnss", geometry_msgs.msg.PointStamped, self._drone_ned_pose_from_gnss_cb)
+    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self._ekf_cb)
+
+    # Setup services
+    rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self._set_planned_actions_srv)
+
+    # Setup publishers
+    self.takeoff_pub = rospy.Publisher("/anafi/cmd_takeoff", std_msgs.msg.Empty, queue_size=1)
+    self.land_pub = rospy.Publisher("/anafi/cmd_land", std_msgs.msg.Empty, queue_size=1)
+
+    self.move_to_pub = rospy.Publisher("/anafi/cmd_moveto", olympe_bridge.msg.MoveToCommand, queue_size=1)
+    self.move_to_ned_pos_pub = rospy.Publisher("/anafi/cmd_moveto_ned_position", geometry_msgs.msg.PointStamped, queue_size=1)
+    self.move_relative_pub = rospy.Publisher("/anafi/cmd_moveby", olympe_bridge.msg.MoveByCommand, queue_size=1)
+
 
 
   def _drone_state_cb(
