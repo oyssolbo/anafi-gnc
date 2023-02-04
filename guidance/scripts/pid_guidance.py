@@ -1,10 +1,20 @@
 #!/usr/bin/python3
 
 # This shit is almost directly copied from Martin Falang (2021-2022), to have
-# a reference to compare to
-# The major difference, is the ROSification of the code, such that it actually
-# exploits basic functionalities with ROS 
+# a reference to compare to in the project thesis
 
+# The major difference compared to what was developed by Falang, is that the code 
+# has undertaken some ROSification. Thus, actually exploiting some basic 
+# ROS functionalities 
+
+# The method is not recommended, and is currently not maintained. It performed 
+# similar to the pure-pursuit guidance module. Due to pure pursuit being
+# standardized, it is recommended. To preserve some of the shit Falang did, in 
+# case it becomes useful for future master thesises, this is kept 
+
+
+assert 0, "This code should not be used! It was only used temporary during the project thesis\
+  to function as a comparative work against the trash of M. Falang. Use pure pursuit guidance, if possible!"
 
 import rospy 
 from geometry_msgs.msg import TwistStamped, PointStamped, QuaternionStamped

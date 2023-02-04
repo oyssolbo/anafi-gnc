@@ -13,6 +13,7 @@ from geometry_msgs.msg import TwistStamped, Vector3Stamped, QuaternionStamped
 from olympe_bridge.msg import AttitudeCommand
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 from scipy.spatial.transform import Rotation
+from std_msgs.msg import Float64MultiArray, MultiArrayLayout, MultiArrayDimension
 
 np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
 
@@ -22,7 +23,7 @@ class VelocityController():
   def __init__(self) -> None:
 
     # Initializing node
-    rospy.init_node("attitude_controller_node")
+    rospy.init_node("velocity controller_node")
     node_rate = rospy.get_param("~node_rate")
     self.dt = 1.0 / node_rate 
     self.rate = rospy.Rate(node_rate)
@@ -50,29 +51,34 @@ class VelocityController():
     )
 
     # Setup services
-    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller)
+    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller_srv)
 
     # Setup subscribers 
     self.use_optical_flow_as_feedback : bool = rospy.get_param("/use_optical_flow_as_feedback")
     if self.use_optical_flow_as_feedback:
-      rospy.loginfo("Node using optical flow velocity estimates as feedback")
+      rospy.loginfo("Velocity controller using optical flow velocity estimates as feedback")
       rospy.Subscriber("/anafi/optical_flow_velocities", Vector3Stamped, self._optical_flow_velocities_cb)
     else:
-      rospy.loginfo("Node using polled velocity estimates as feedback")
+      rospy.loginfo("Velocity controller using polled velocity estimates as feedback")
       rospy.Subscriber("/anafi/polled_body_velocities", TwistStamped, self._polled_velocities_cb)
 
-    use_pure_pursuit_guidance : bool = rospy.get_param("/use_pure_pursuit_guidance")
+    # Possibility to use both pure-pursuit and PID-guidance. The project-thesis shows that these are
+    # really similar, as long as one is actually able to use the correct formula (which M. Falang was
+    # not able to, and therefore got skewed results). The code leaves up to change the guidance module,
+    # but the pure-pursuit is used as default. Will currently crash if default-value is removed 
+    use_pure_pursuit_guidance : bool = rospy.get_param("/use_pure_pursuit_guidance", default=True)
     if use_pure_pursuit_guidance:
-      rospy.loginfo("Node using pure pursuit guidance as velocity reference")
+      rospy.loginfo("Velocity controller using pure pursuit guidance as velocity reference")
       rospy.Subscriber("/guidance/pure_pursuit/velocity_reference", TwistStamped, self._reference_velocities_cb)
     else:
-      rospy.loginfo("Node using PID-based guidance as velocity reference")
+      rospy.loginfo("Velocity controller using PID-based guidance as velocity reference")
       rospy.Subscriber("/guidance/pid/velocity_reference", TwistStamped, self._reference_velocities_cb)
 
     rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
 
     # Setup publishers
     self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
+    self.ipid_delta_hat_pub = rospy.Publisher("/ipid/delta_hat", Float64MultiArray, queue_size=1)
 
     # Initial values
     self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
@@ -86,6 +92,15 @@ class VelocityController():
     self.is_controller_active : bool = False
 
 
+  def _enable_controller_srv(self, msg : SetBoolRequest) -> SetBoolResponse:
+    self.is_controller_active = msg.data
+
+    res = SetBoolResponse()
+    res.success = True
+    res.message = "" 
+    return res 
+
+
   def _reference_velocities_cb(self, msg : TwistStamped) -> None:
     msg_timestamp = msg.header.stamp
 
@@ -95,15 +110,6 @@ class VelocityController():
 
     self.guidance_timestamp = msg_timestamp
     self.guidance_reference_velocities = np.array([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]).T
-
-
-  def _enable_controller(self, msg : SetBoolRequest) -> SetBoolResponse:
-    self.is_controller_active = msg.data
-
-    res = SetBoolResponse()
-    res.success = True
-    res.message = "" 
-    return res 
 
 
   def _polled_velocities_cb(self, msg : TwistStamped) -> None:
@@ -170,6 +176,9 @@ class VelocityController():
   def publish_attitude_ref(self) -> None:
     attitude_cmd_msg = AttitudeCommand()
 
+    delta_hat_msg = Float64MultiArray()
+    delta_hat_msg.layout = MultiArrayLayout()
+
     v_ref_body = np.zeros((5, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
@@ -195,6 +204,11 @@ class VelocityController():
         attitude_cmd_msg.gaz = att_ref_3D[3]
 
         self.attitude_ref_pub.publish(attitude_cmd_msg)
+
+        # Publish current adaptive estimates in roll and pitch
+        delta_hat = self.controller.get_delta_hat()
+        delta_hat_msg.data = [delta_hat[0], delta_hat[1]]
+        self.ipid_delta_hat_pub.publish(delta_hat_msg)
 
       else:
         self.guidance_reference_velocities = np.zeros((3, 1))

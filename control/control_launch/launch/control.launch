@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-
-  <!-- Controller nodes -->
-  <include file="$(find velocity_control)/launch/velocity_controller.launch" pass_all_args="true"/>
-</launch>

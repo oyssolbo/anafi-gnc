@@ -16,17 +16,17 @@ import guidance_helpers.utilities as utilities
 
 np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
 
+
 class PurePursuitGuidanceLaw():
   """
   Guidance law generating the desired velocity based on the 
   desired and current position 
   """
   def __init__(self) -> None:
-    node_name = rospy.get_param("~node_name", default = "pure_pursuit_guidance_node")
+    rospy.init_node("pure_pursuit_guidance_node")
+
     controller_rate = rospy.get_param("~node_rate", default = 20)
     self.dt = 1.0 / controller_rate 
-
-    rospy.init_node(node_name)
     self.rate = rospy.Rate(controller_rate)
 
     # Initialize parameters
@@ -46,8 +46,8 @@ class PurePursuitGuidanceLaw():
     self.position_timestamp : std_msgs.msg.Time = None
     self.attitude_timestamp : std_msgs.msg.Time = None
 
-    self.desired_position : np.ndarray = None  # [xd, yd, zd]
-    self.position : np.ndarray = None 
+    self.desired_position_ned : np.ndarray = np.zeros((3, 1))  # [xd, yd, zd]
+    self.position_body : np.ndarray = None 
 
     self.last_rotation_matrix_body_to_vehicle : np.ndarray = None
 
@@ -56,21 +56,26 @@ class PurePursuitGuidanceLaw():
 
     self.use_ned_pos_from_gnss : bool = rospy.get_param("/use_ned_pos_from_gnss")
     if self.use_ned_pos_from_gnss:
-      rospy.loginfo("Node using position estimates from GNSS. Estimates from EKF disabled")
+      rospy.loginfo("Pure pursuit using position estimates from GNSS. Estimates from EKF disabled")
       rospy.Subscriber("/anafi/ned_pos_from_gnss", PointStamped, self._ned_pos_cb)
       rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
     else:
-      rospy.loginfo("Node using position estimates from EKF. Position estimates from GNSS disabled")
+      rospy.loginfo("Pure pursuit using position estimates from EKF. Position estimates from GNSS disabled")
       rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
 
     # Set up publishers
     self.reference_velocity_publisher = rospy.Publisher("/guidance/pure_pursuit/velocity_reference", TwistStamped, queue_size=1)
 
     # Set up services
-    rospy.Service("/guidance/service/set_desired_position", SetDesiredPosition, self._set_desired_position_cb)
+    rospy.Service("/guidance/service/set_desired_position", SetDesiredPosition, self._set_desired_position_srv)
 
 
   def _ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
+    """
+    Callback setting the current poisition from the EKF estimate. Note that the position
+    estimate is in body, and it is drone to helipad (origin). Thus, to get origin to drone,
+    the values are inverted 
+    """
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.position_timestamp, msg_timestamp):
@@ -78,10 +83,14 @@ class PurePursuitGuidanceLaw():
       return
     
     self.position_timestamp = msg_timestamp
-    self.position = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
+    self.position_body = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
 
 
   def _ned_pos_cb(self, msg : PointStamped) -> None:
+    """
+    Position estimates using the direct bridge-estimates in NED. These measurements are 
+    origin to drone position
+    """
     msg_timestamp = msg.header.stamp
 
     if not utilities.is_new_msg_timestamp(self.position_timestamp, msg_timestamp):
@@ -94,7 +103,7 @@ class PurePursuitGuidanceLaw():
     
     # Positions must be transformed to body
     self.position_timestamp = msg_timestamp
-    self.position = self.last_rotation_matrix_body_to_vehicle.T @ np.array([msg.point.x, msg.point.y, msg.point.z], dtype=float).reshape((3, 1)) 
+    self.position_body = self.last_rotation_matrix_body_to_vehicle.T @ np.array([msg.point.x, msg.point.y, msg.point.z], dtype=float).reshape((3, 1)) 
 
 
   def _attitude_cb(self, msg : QuaternionStamped) -> None:
@@ -110,8 +119,15 @@ class PurePursuitGuidanceLaw():
     self.last_rotation_matrix_body_to_vehicle = rotation.as_matrix()
 
 
-  def _set_desired_position_cb(self, position_req : SetDesiredPositionRequest) -> SetDesiredPositionResponse:
-    self.desired_position = np.array([position_req.x_d, position_req.y_d, position_req.z_d], dtype=np.float) 
+  def _set_desired_position_srv(self, position_req : SetDesiredPositionRequest) -> SetDesiredPositionResponse:
+    """
+    Possible extension of setting a desired position. Currently not implemented
+
+    It is assumed that the desired positions are given in NED. Must be used for transforming
+    the problem into a desired velocity in either Body or NED. Using the pure-pursuit law, it might
+    be better to work entirely in NED - including the velocity 
+    """
+    self.desired_position_ned = np.array([position_req.x_d, position_req.y_d, position_req.z_d], dtype=np.float) 
 
     res = SetDesiredPositionRequest()
     res.success = True
@@ -129,13 +145,15 @@ class PurePursuitGuidanceLaw():
   def _get_valid_pos_error(self) -> np.ndarray:
     """
     Returns a valid error for position
+
+    Would have to use the desired position 
     """
     if (self.position_timestamp is None):
       return np.zeros((3, 1))
 
     # Using a target-position above the helipad to guide safely
     # target_position = np.array([0, 0, 0.25]).reshape((3, 1))
-    # error = -self.position #- target_position
+    # error = -self.position_body #- target_position
     # altitude_error = (self.desired_altitude + self.position[2]) 
     # if np.linalg.norm(self.position[:2]) >= 0.2 and np.abs(self.position[2]) < 1.0:
     #   altitude_error = 0
@@ -152,7 +170,7 @@ class PurePursuitGuidanceLaw():
     Why tf does it suddenly get into a matrix??
     Fuck python is such a terrible language...
     """
-    return np.array([self.position[0], self.position[1], self.position[2]], dtype=np.float)
+    return np.array([self.position_body[0], self.position_body[1], self.position_body[2]], dtype=np.float)
 
 
   def calculate_velocity_reference(self) -> None:
@@ -162,11 +180,10 @@ class PurePursuitGuidanceLaw():
     """
     twist_ref_msg = TwistStamped()
 
-    zeros_3_1 = np.zeros((3, 1))
-    vel_target = zeros_3_1 # Possible extension to use constant bearing guidance in the future
+    vel_target = np.zeros((3, 1)) # Possible extension to use constant bearing guidance in the future
 
     while not rospy.is_shutdown():
-      if self.position is None:
+      if self.position_body is None:
         self.rate.sleep()
         continue
 

@@ -1,0 +1,81 @@
+drone:
+  mass_g: 315
+#   camera:
+#     img_width: 1280
+#     img_height: 720
+#     offset_x_mm: 70
+#     offset_y_mm: 0
+#     offset_z_mm: 0
+#     camera_matrix: [9.412189028123261778e+02, 0.000000000000000000e+00, 5.806581517118189595e+02,
+#                     0.000000000000000000e+00, 9.326606388000454899e+02, 3.753484894513629229e+02,
+#                     0.000000000000000000e+00, 0.000000000000000000e+00, 1.000000000000000000e+00]
+  
+# topics:
+#   olympe_bridge:
+#     output:
+#       image:              "/anafi/image"              # geometry_msgs.msg.Image
+#       time:               "/anafi/time"               # std_msgs.msg.Time
+
+#       height:             "/anafi/height"             # std_msgs.msg.Float32
+#       location:           "/anafi/location"           # geometry_msgs.msg.PointStamped
+#       attitude:           "/anafi/attitude"           # geometry_msgs.msg.QuaternionStamped
+#       pose:               "/anafi/pose"               # geometry_msgs.msg.PoseStamped
+#       twist_body:         "/anafi/twist_body"         # geometry_msgs.msg.TwistStamped
+#       optical_flow_speed: "/anafi/optical_flow_speed" # geometry_msgs.msg.Vector3Stamped
+#       odometry:           "/anafi/odometry"           # nav_msgs.msg.Odometry
+
+#       wifi_throughput:    "/anafi/link_goodput"       # std_msgs.msg.UInt16
+#       wifi_quality:       "/anafi/link_quality"       # std_msgs.msg.UInt8
+#       wifi_rssi:          "/anafi/wifi_rssi"          # std_msgs.msg.Int8
+
+#       battery:            "/anafi/battery"            # std_msgs.msg.UInt8
+#       state:              "/anafi/state"              # std_msgs.msg.String
+
+#     input:      
+#       land:               "/anafi/land"               # std_msgs.msg.Empty
+#       takeoff:            "/anafi/takeoff"            # std_msgs.msg.Empty
+#       kill_motors:        "/anafi/emergency"          # std_msgs.msg.Empty
+
+#       cmd_attitude:       "/anafi/cmd_rpyt"           # olympe_bridge.msg.AttitudeSetpoint
+#       cmd_move_to_ecef:   "/anafi/cmd_moveto"         # olympe_bridge.msg.MoveToCommand
+#       cmd_move_relative:  "/anafi/cmd_moveby"         # olympe_bridge.msg.MoveToCommand
+    
+#   ground_truth:
+#     output:
+#       drone_pose_ned:
+#         sim:              "/ground_truth/ned_frame/drone_pose"
+#         real:             "/qualisys/anafi/pose"
+
+#       helipad_pose_ned:
+#         sim:              "/ground_truth/ned_frame/helipad_pose"
+#         real:             "/qualisys/helipad/pose"
+
+#       drone_pose_helipad_frame:
+#         sim:              "/ground_truth/helipad_frame/drone_pose"
+#         real:             "/ground_truth/helipad_frame/drone_pose"
+
+#       helipad_pose_body_frame:
+#         sim:              "/ground_truth/body_frame/helipad_pose"
+#         real:             "/ground_truth/body_frame/helipad_pose"
+
+#   ekf:
+#     output:
+#       estimate:           "/estimate/ekf" # change this to /ekf/estimate
+#     input:
+#       topic_name:         "/drone/out/ekf_input"
+
+#   dnn-cv:
+#     output:
+#       position:           "/estimate/dnn_cv/position"
+#       heading:            "/estimate/dnn_cv/heading"
+#     input:
+#       bounding_boxes:     "/darknet_ros/bounding_boxes"
+
+#   guidance:
+#     velocity_reference:   "/guidance/velocity_reference"
+
+
+# services:
+#   controllers:
+#     velocity_control:
+#       enable_controller:   "/velocity_controller/service/enable_controller"  # std_srvs.srv.SetBool

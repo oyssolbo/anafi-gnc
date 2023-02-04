@@ -19,11 +19,11 @@ pid:
   x_axis:
     kp: 0.35   
     ki: 0.1  
-    kd: 0.1
+    kd: 0.0
   y_axis:
     kp: 0.35 
     ki: 0.1  
-    kd: 0.1
+    kd: 0.0
 
 linear_drag_model:
   drone_mass: 0.320 # This was set to 320, such that Martin used it in grams... Fucking idiot!
@@ -36,9 +36,9 @@ ipid:
     alpha: 0.32
     kp: 0.35   
     ki: 0.1  
-    kd: 0.05
+    kd: 0.0
   y_axis:
     alpha: 0.32
     kp: 0.35 
     ki: 0.1  
-    kd: 0.05
+    kd: 0.0

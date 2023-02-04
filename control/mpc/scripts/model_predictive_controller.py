@@ -193,7 +193,7 @@ class ModelPredictiveController():
     return np.vstack(
       [
         # self.integrated_horizontal_position_body.copy(),
-        self.position_body,
+        self._convert_body_array_to_ned(self.position_body),
         self._convert_body_array_to_ned(self.velocities_body)[:2],  # Simplest to use ned-velocities as input. 
                                                                     # Only giving the horizontal velocities as input  
         self.attitude_rpy
