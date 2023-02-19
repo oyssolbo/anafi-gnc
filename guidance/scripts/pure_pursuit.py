@@ -54,7 +54,7 @@ class PurePursuitGuidanceLaw():
 
     # Set up subscribers 
     rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
-    rospy.Subscriber("/guidance/target_position", PointStamped, self._target_pos_cb)
+    rospy.Subscriber("/guidance/desired_ned_position", PointStamped, self._desired_ned_pos_cb)
 
     self.use_ned_pos_from_gnss : bool = rospy.get_param("/use_ned_pos_from_gnss")
     if self.use_ned_pos_from_gnss:
@@ -67,9 +67,6 @@ class PurePursuitGuidanceLaw():
 
     # Set up publishers
     self.reference_velocity_publisher = rospy.Publisher("/guidance/pure_pursuit/velocity_reference", TwistStamped, queue_size=1)
-
-    # Set up services
-    rospy.Service("/guidance/service/set_desired_position", SetDesiredPosition, self._set_desired_position_srv)
 
 
   def _ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
@@ -88,7 +85,7 @@ class PurePursuitGuidanceLaw():
     self.position_body = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
 
 
-  def _target_pos_cb(self, msg : PointStamped) -> None:
+  def _desired_ned_pos_cb(self, msg : PointStamped) -> None:
     """
     Callback setting the desired position for the guidance to track. 
     The target position is assumed in NED 
@@ -136,21 +133,6 @@ class PurePursuitGuidanceLaw():
     self.last_rotation_matrix_body_to_vehicle = rotation.as_matrix()
 
 
-  def _set_desired_position_srv(self, position_req : SetDesiredPositionRequest) -> SetDesiredPositionResponse:
-    """
-    Possible extension of setting a desired position. Currently not implemented
-
-    It is assumed that the desired positions are given in NED. Must be used for transforming
-    the problem into a desired velocity in either Body or NED. Using the pure-pursuit law, it might
-    be better to work entirely in NED - including the velocity 
-    """
-    self.desired_position_ned = np.array([position_req.x_d, position_req.y_d, position_req.z_d], dtype=np.float) 
-
-    res = SetDesiredPositionRequest()
-    res.success = True
-    return res 
-
-
   def _clamp(
         self, 
         value: float, 
@@ -161,9 +143,9 @@ class PurePursuitGuidanceLaw():
 
   def _get_pos_error_body(self) -> np.ndarray:
     """
-    Returns a valid error for position
-
-    Would have to use the desired position 
+    Calculates a position error in body
+    Assumes the attitude is known relatively correctly, such that body can be converted
+    to NED
     """
     if (self.position_timestamp is None):
       return np.zeros((3, 1))
