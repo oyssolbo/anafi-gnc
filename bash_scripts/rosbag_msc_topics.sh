@@ -54,7 +54,8 @@ ESTIMATE_TOPICS="\
         /estimate/person_detected"
 
 GNC_TOPICS="\
-        /guidance/pure_pursuit/velocity_reference"
+        /guidance/pure_pursuit/velocity_reference
+        /guidance/desired_ned_position"
 
 PLANNING_TOPICS="\
         /mission_controller/planning_status"
