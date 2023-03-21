@@ -93,6 +93,7 @@ class VelocityController():
 
 
   def _enable_controller_srv(self, msg : SetBoolRequest) -> SetBoolResponse:
+    rospy.loginfo("Action request received: " + str(msg.data))
     self.is_controller_active = msg.data
 
     res = SetBoolResponse()
@@ -194,9 +195,8 @@ class VelocityController():
           v=self.velocities, 
           ts=self.velocities_timestamp
         )
-        att_ref = self._prevent_underflow(att_ref)
 
-        att_ref_3D = np.array([att_ref[0], -att_ref[1], 0, v_ref_ned[2]], dtype=np.float64) 
+        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, v_ref_ned[2]], dtype=np.float64) 
         attitude_cmd_msg.header.stamp = rospy.Time.now()
         attitude_cmd_msg.roll = att_ref_3D[0]   
         attitude_cmd_msg.pitch = att_ref_3D[1]

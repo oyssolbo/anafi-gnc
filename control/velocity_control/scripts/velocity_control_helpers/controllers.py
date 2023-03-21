@@ -64,13 +64,14 @@ class PID(GenericController):
       ts    : float
     ) -> np.ndarray:
     # print(-v[:2] + v_ref[:2].T)
-    print(v.ravel())
-    print(v_ref.ravel())
-    print()
     error = (-v.ravel()[:2] + v_ref.ravel()[:2].T).reshape((2))
 
-    error_surge = error[0]
+    error_surge = -error[0] # Negated to ensure correct angle
     error_sway = error[1]
+
+    # For testing with the mission planning. The interaction with the PID controller often fail 
+    print(error)
+    print("") 
 
     if self.prev_ts is not None and ts != self.prev_ts:
       dt = (ts - self.prev_ts).to_sec()
