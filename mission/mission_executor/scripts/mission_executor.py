@@ -351,7 +351,7 @@ class MissionExecutorNode():
         next_y = current_y_pos + length_multiplier * search_side_length
 
         # Multiplication to achieve the expanding square search
-        length_multiplier = length_multiplier * (-2.0)
+        length_multiplier += 1 # length_multiplier * (-2.0)
 
       next_pos = [next_x, next_y, search_altitude]
       search_points_ned[:, side_idx] = np.array(next_pos, dtype=np.float).reshape((3, 1)).ravel()
