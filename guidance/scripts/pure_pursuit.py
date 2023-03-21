@@ -6,7 +6,7 @@ import sensor_msgs.msg
 
 from scipy.spatial.transform import Rotation
 
-from geometry_msgs.msg import TwistStamped, PointStamped, QuaternionStamped
+from geometry_msgs.msg import TwistStamped, PointStamped, QuaternionStamped, PoseWithCovarianceStamped
 
 from anafi_uav_msgs.msg import PointWithCovarianceStamped
 from anafi_uav_msgs.srv import SetDesiredPosition, SetDesiredPositionRequest, SetDesiredPositionResponse
@@ -53,23 +53,22 @@ class PurePursuitGuidanceLaw():
     self.last_rotation_matrix_body_to_vehicle : np.ndarray = None
 
     # Set up subscribers 
-    rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
     rospy.Subscriber("/guidance/desired_ned_position", PointStamped, self._desired_ned_pos_cb)
+    rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
 
     self.use_ned_pos_from_gnss : bool = rospy.get_param("/use_ned_pos_from_gnss")
     if self.use_ned_pos_from_gnss:
       rospy.loginfo("Pure pursuit using position estimates from GNSS. Estimates from EKF disabled")
       rospy.Subscriber("/anafi/ned_pos_from_gnss", PointStamped, self._ned_pos_cb)
-      rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
     else:
       rospy.loginfo("Pure pursuit using position estimates from EKF. Position estimates from GNSS disabled")
-      rospy.Subscriber("/estimate/ekf", PointWithCovarianceStamped, self._ekf_cb)
+      rospy.Subscriber("/estimate/ekf", PoseWithCovarianceStamped, self._ekf_cb)
 
     # Set up publishers
     self.reference_velocity_publisher = rospy.Publisher("/guidance/pure_pursuit/velocity_reference", TwistStamped, queue_size=1)
 
 
-  def _ekf_cb(self, msg : PointWithCovarianceStamped) -> None:
+  def _ekf_cb(self, msg : PoseWithCovarianceStamped) -> None:
     """
     Callback setting the current poisition from the EKF estimate. Note that the position
     estimate is in body, and it is drone to helipad (origin). Thus, to get origin to drone,
@@ -82,7 +81,7 @@ class PurePursuitGuidanceLaw():
       return
     
     self.position_timestamp = msg_timestamp
-    self.position_body = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
+    self.position_body = -np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z], dtype=float).reshape((3, 1)) 
 
 
   def _desired_ned_pos_cb(self, msg : PointStamped) -> None:
