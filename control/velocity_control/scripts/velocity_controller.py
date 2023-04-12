@@ -50,8 +50,21 @@ class VelocityController():
       K_z=velocity_reference_K_z
     )
 
-    # Setup services
-    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller_srv)
+    # Initial values
+    self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
+    self.velocities : np.ndarray = np.zeros((3, 1))
+    self.quaternion_body_to_ned : np.ndarray = np.array([1, 0, 0, 0], dtype=np.float)
+
+    self.attitude_timestamp : std_msgs.msg.Time = None
+    self.velocities_timestamp : std_msgs.msg.Time = None
+    self.guidance_timestamp : std_msgs.msg.Time = None
+
+    self.is_controller_active : bool = False
+
+    # Setup publishers
+    self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
+    self.ipid_delta_hat_pub = rospy.Publisher("/ipid/delta_hat", Float64MultiArray, queue_size=1)
+    self.velocity_error_pub = rospy.Publisher("/velocity_error", Float64MultiArray, queue_size=1)
 
     # Setup subscribers 
     self.use_optical_flow_as_feedback : bool = rospy.get_param("/use_optical_flow_as_feedback")
@@ -76,21 +89,8 @@ class VelocityController():
 
     rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
 
-    # Setup publishers
-    self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
-    self.ipid_delta_hat_pub = rospy.Publisher("/ipid/delta_hat", Float64MultiArray, queue_size=1)
-    self.velocity_error_pub = rospy.Publisher("/velocity_error", Float64MultiArray, queue_size=1)
-
-    # Initial values
-    self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
-    self.velocities : np.ndarray = np.zeros((3, 1))
-    self.quaternion_body_to_ned : np.ndarray = np.array([1, 0, 0, 0], dtype=np.float)
-
-    self.attitude_timestamp : std_msgs.msg.Time = None
-    self.velocities_timestamp : std_msgs.msg.Time = None
-    self.guidance_timestamp : std_msgs.msg.Time = None
-
-    self.is_controller_active : bool = False
+    # Setup services
+    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller_srv)
 
 
   def _enable_controller_srv(self, msg : SetBoolRequest) -> SetBoolResponse:
@@ -223,7 +223,7 @@ class VelocityController():
         attitude_cmd_msg.gaz = att_ref_3D[3]
 
         self.attitude_ref_pub.publish(attitude_cmd_msg)
-        
+
         self._publish_body_velocity_error(v_ref_body=v_ref_body, v_body=self.velocities)
 
 
