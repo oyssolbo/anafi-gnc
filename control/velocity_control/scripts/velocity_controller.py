@@ -79,6 +79,7 @@ class VelocityController():
     # Setup publishers
     self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
     self.ipid_delta_hat_pub = rospy.Publisher("/ipid/delta_hat", Float64MultiArray, queue_size=1)
+    self.velocity_error_pub = rospy.Publisher("/velocity_error", Float64MultiArray, queue_size=1)
 
     # Initial values
     self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
@@ -156,6 +157,24 @@ class VelocityController():
     """
     rot_body_to_ned = Rotation(quat=self.quaternion_body_to_ned).as_matrix()
     return rot_body_to_ned.T @ velocities_body
+  
+
+  def _publish_body_velocity_error(
+        self, 
+        v_ref_body  : np.ndarray,
+        v_body      : np.ndarray) -> None:
+    e_body = (v_ref_body[:3].T - v_body[:3]).flatten()
+
+    # For testing with the mission planning. The interaction with the PID controller often fail 
+    print(e_body)
+    print("")
+
+    error_msg = Float64MultiArray()
+    error_msg.data.append(e_body[0])
+    error_msg.data.append(e_body[1])
+    error_msg.data.append(e_body[2])
+
+    self.velocity_error_pub.publish(error_msg)
 
 
   def _prevent_underflow(
@@ -204,6 +223,9 @@ class VelocityController():
         attitude_cmd_msg.gaz = att_ref_3D[3]
 
         self.attitude_ref_pub.publish(attitude_cmd_msg)
+        
+        self._publish_body_velocity_error(v_ref_body=v_ref_body, v_body=self.velocities)
+
 
         # Publish current adaptive estimates in roll and pitch
         delta_hat = self.controller.get_delta_hat()
