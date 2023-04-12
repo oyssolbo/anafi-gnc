@@ -162,7 +162,8 @@ class VelocityController():
   def _publish_body_velocity_error(
         self, 
         v_ref_body  : np.ndarray,
-        v_body      : np.ndarray) -> None:
+        v_body      : np.ndarray
+      ) -> None:
     e_body = (v_ref_body[:3].T - v_body[:3]).flatten()
 
     # For testing with the mission planning. The interaction with the PID controller often fail 
@@ -177,28 +178,34 @@ class VelocityController():
     self.velocity_error_pub.publish(error_msg)
 
 
-  def _prevent_underflow(
+  def _publish_delta_hat(
         self, 
-        arr       : np.ndarray, 
-        min_value : float       = 1e-6
-      ) -> np.ndarray:
-    """
-    Preventing underflow to setting all values with an absolute value below
-    @p min_value to 0 
-    """
-    with np.nditer(arr, op_flags=['readwrite']) as iterator:
-      for val in iterator:
-        if np.abs(val) < min_value:
-          val[...] = 0
-    return arr
+        delta_hat : tuple
+      ) -> None:
+    delta_hat_msg = Float64MultiArray()
+    delta_hat_msg.layout = MultiArrayLayout()
+    delta_hat_msg.data = [delta_hat[0], delta_hat[1]]
+    self.ipid_delta_hat_pub.publish(delta_hat_msg)
+
+
+  def _publish_attitude_msg(
+        self, 
+        attitude_reference  : np.ndarray,
+        heave_reference_ned : float
+      ) -> None:    
+    attitude_cmd_msg = AttitudeCommand()
+
+    attitude_cmd_msg.header.stamp = rospy.Time.now()
+    attitude_cmd_msg.roll = attitude_reference[0]   
+    attitude_cmd_msg.pitch = attitude_reference[1]
+    attitude_cmd_msg.yaw = 0
+    attitude_cmd_msg.gaz = heave_reference_ned
+
+    self.attitude_ref_pub.publish(attitude_cmd_msg)
+
 
 
   def publish_attitude_ref(self) -> None:
-    attitude_cmd_msg = AttitudeCommand()
-
-    delta_hat_msg = Float64MultiArray()
-    delta_hat_msg.layout = MultiArrayLayout()
-
     v_ref_body = np.zeros((5, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
@@ -208,29 +215,15 @@ class VelocityController():
           dt=self.dt
         )
         v_ref_ned = self._convert_body_velocities_to_ned(np.array([v_ref_body[0], v_ref_body[1], v_ref_body[4]]))
-
         att_ref = self.controller.get_attitude_reference(
           v_ref=v_ref_body,
           v=self.velocities, 
           ts=self.velocities_timestamp
         )
 
-        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, v_ref_ned[2]], dtype=np.float64) 
-        attitude_cmd_msg.header.stamp = rospy.Time.now()
-        attitude_cmd_msg.roll = att_ref_3D[0]   
-        attitude_cmd_msg.pitch = att_ref_3D[1]
-        attitude_cmd_msg.yaw = att_ref_3D[2]
-        attitude_cmd_msg.gaz = att_ref_3D[3]
-
-        self.attitude_ref_pub.publish(attitude_cmd_msg)
-
+        self._publish_attitude_msg(attitude_reference=att_ref, heave_reference_ned=v_ref_ned[2])
         self._publish_body_velocity_error(v_ref_body=v_ref_body, v_body=self.velocities)
-
-
-        # Publish current adaptive estimates in roll and pitch
-        delta_hat = self.controller.get_delta_hat()
-        delta_hat_msg.data = [delta_hat[0], delta_hat[1]]
-        self.ipid_delta_hat_pub.publish(delta_hat_msg)
+        self._publish_delta_hat(self.controller.get_delta_hat())
 
       else:
         self.guidance_reference_velocities = np.zeros((3, 1))
