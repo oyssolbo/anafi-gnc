@@ -58,7 +58,8 @@ GNC_TOPICS="\
         /guidance/desired_ned_position"
 
 PLANNING_TOPICS="\
-        /mission_controller/planning_status"
+        /mission_controller/planning_status \
+        /move_action/desired_ned_position"
 
 STANDARD_TOPICS="\
         $ANAFI_OUTPUT_TOPICS \
