@@ -50,8 +50,21 @@ class VelocityController():
       K_z=velocity_reference_K_z
     )
 
-    # Setup services
-    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller_srv)
+    # Initial values
+    self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
+    self.velocities : np.ndarray = np.zeros((3, 1))
+    self.quaternion_body_to_ned : np.ndarray = np.array([1, 0, 0, 0], dtype=np.float)
+
+    self.attitude_timestamp : std_msgs.msg.Time = None
+    self.velocities_timestamp : std_msgs.msg.Time = None
+    self.guidance_timestamp : std_msgs.msg.Time = None
+
+    self.is_controller_active : bool = False
+
+    # Setup publishers
+    self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
+    self.ipid_delta_hat_pub = rospy.Publisher("/ipid/delta_hat", Float64MultiArray, queue_size=1)
+    self.velocity_error_pub = rospy.Publisher("/velocity_error", Float64MultiArray, queue_size=1)
 
     # Setup subscribers 
     self.use_optical_flow_as_feedback : bool = rospy.get_param("/use_optical_flow_as_feedback")
@@ -76,20 +89,8 @@ class VelocityController():
 
     rospy.Subscriber("/anafi/attitude", QuaternionStamped, self._attitude_cb)
 
-    # Setup publishers
-    self.attitude_ref_pub = rospy.Publisher("/anafi/cmd_rpyt", AttitudeCommand, queue_size=1)
-    self.ipid_delta_hat_pub = rospy.Publisher("/ipid/delta_hat", Float64MultiArray, queue_size=1)
-
-    # Initial values
-    self.guidance_reference_velocities : np.ndarray = np.zeros((3, 1))
-    self.velocities : np.ndarray = np.zeros((3, 1))
-    self.quaternion_body_to_ned : np.ndarray = np.array([1, 0, 0, 0], dtype=np.float)
-
-    self.attitude_timestamp : std_msgs.msg.Time = None
-    self.velocities_timestamp : std_msgs.msg.Time = None
-    self.guidance_timestamp : std_msgs.msg.Time = None
-
-    self.is_controller_active : bool = False
+    # Setup services
+    rospy.Service("/velocity_controller/service/enable_controller", SetBool, self._enable_controller_srv)
 
 
   def _enable_controller_srv(self, msg : SetBoolRequest) -> SetBoolResponse:
@@ -156,30 +157,55 @@ class VelocityController():
     """
     rot_body_to_ned = Rotation(quat=self.quaternion_body_to_ned).as_matrix()
     return rot_body_to_ned.T @ velocities_body
+  
 
-
-  def _prevent_underflow(
+  def _publish_body_velocity_error(
         self, 
-        arr       : np.ndarray, 
-        min_value : float       = 1e-6
-      ) -> np.ndarray:
-    """
-    Preventing underflow to setting all values with an absolute value below
-    @p min_value to 0 
-    """
-    with np.nditer(arr, op_flags=['readwrite']) as iterator:
-      for val in iterator:
-        if np.abs(val) < min_value:
-          val[...] = 0
-    return arr
+        v_ref_body  : np.ndarray,
+        v_body      : np.ndarray
+      ) -> None:
+    e_body = (v_ref_body[:3].T - v_body[:3]).flatten()
+
+    # For testing with the mission planning. The interaction with the PID controller often fail 
+    print(e_body)
+    print("")
+
+    error_msg = Float64MultiArray()
+    error_msg.data.append(e_body[0])
+    error_msg.data.append(e_body[1])
+    error_msg.data.append(e_body[2])
+
+    self.velocity_error_pub.publish(error_msg)
+
+
+  def _publish_delta_hat(
+        self, 
+        delta_hat : tuple
+      ) -> None:
+    delta_hat_msg = Float64MultiArray()
+    delta_hat_msg.layout = MultiArrayLayout()
+    delta_hat_msg.data = [delta_hat[0], delta_hat[1]]
+    self.ipid_delta_hat_pub.publish(delta_hat_msg)
+
+
+  def _publish_attitude_msg(
+        self, 
+        attitude_reference  : np.ndarray,
+        heave_reference_ned : float
+      ) -> None:    
+    attitude_cmd_msg = AttitudeCommand()
+
+    attitude_cmd_msg.header.stamp = rospy.Time.now()
+    attitude_cmd_msg.roll = attitude_reference[0]   
+    attitude_cmd_msg.pitch = attitude_reference[1]
+    attitude_cmd_msg.yaw = 0
+    attitude_cmd_msg.gaz = heave_reference_ned
+
+    self.attitude_ref_pub.publish(attitude_cmd_msg)
+
 
 
   def publish_attitude_ref(self) -> None:
-    attitude_cmd_msg = AttitudeCommand()
-
-    delta_hat_msg = Float64MultiArray()
-    delta_hat_msg.layout = MultiArrayLayout()
-
     v_ref_body = np.zeros((5, 1))
     while not rospy.is_shutdown():
       if self.is_controller_active:
@@ -189,26 +215,15 @@ class VelocityController():
           dt=self.dt
         )
         v_ref_ned = self._convert_body_velocities_to_ned(np.array([v_ref_body[0], v_ref_body[1], v_ref_body[4]]))
-
         att_ref = self.controller.get_attitude_reference(
           v_ref=v_ref_body,
           v=self.velocities, 
           ts=self.velocities_timestamp
         )
 
-        att_ref_3D = np.array([att_ref[0], att_ref[1], 0, v_ref_ned[2]], dtype=np.float64) 
-        attitude_cmd_msg.header.stamp = rospy.Time.now()
-        attitude_cmd_msg.roll = att_ref_3D[0]   
-        attitude_cmd_msg.pitch = att_ref_3D[1]
-        attitude_cmd_msg.yaw = att_ref_3D[2]
-        attitude_cmd_msg.gaz = att_ref_3D[3]
-
-        self.attitude_ref_pub.publish(attitude_cmd_msg)
-
-        # Publish current adaptive estimates in roll and pitch
-        delta_hat = self.controller.get_delta_hat()
-        delta_hat_msg.data = [delta_hat[0], delta_hat[1]]
-        self.ipid_delta_hat_pub.publish(delta_hat_msg)
+        self._publish_attitude_msg(attitude_reference=att_ref, heave_reference_ned=v_ref_ned[2])
+        self._publish_body_velocity_error(v_ref_body=v_ref_body, v_body=self.velocities)
+        self._publish_delta_hat(self.controller.get_delta_hat())
 
       else:
         self.guidance_reference_velocities = np.zeros((3, 1))
