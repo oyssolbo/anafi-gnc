@@ -166,10 +166,6 @@ class VelocityController():
       ) -> None:
     e_body = (v_ref_body[:3].T - v_body[:3]).flatten()
 
-    # For testing with the mission planning. The interaction with the PID controller often fail 
-    print(e_body)
-    print("")
-
     error_msg = Float64MultiArray()
     error_msg.data.append(e_body[0])
     error_msg.data.append(e_body[1])
