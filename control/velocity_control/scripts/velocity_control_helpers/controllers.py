@@ -8,8 +8,10 @@ def get_controller(controller_type: str):
   if controller_type == "pid":
     return PID
   elif controller_type == "linear_drag_model":
+    assert 0, "Don't do this to yourself... Use PID"
     return LinearDragModel
   elif controller_type == "ipid":
+    assert 0, "Don't do this to yourself... Use PID"
     return iPID
   else:
     raise ValueError("Invalid generator type")
@@ -63,10 +65,9 @@ class PID(GenericController):
       v     : np.ndarray, 
       ts    : float
     ) -> np.ndarray:
-    # print(-v[:2] + v_ref[:2].T)
     error = (-v.ravel()[:2] + v_ref.ravel()[:2].T).reshape((2))
 
-    error_surge = -error[0] # Negated to ensure correct angle
+    error_surge = -error[0] # Negated to ensure correct angle definition
     error_sway = error[1]
 
     if self.prev_ts is not None and ts != self.prev_ts:
@@ -77,12 +78,12 @@ class PID(GenericController):
 
       self.prev_error = error
 
-      # Avoid integral windup
-      if self.pitch_limits[0] <= self.error_int[0] <= self.pitch_limits[1]:
-        self.error_int[0] += error_surge * dt
+      # Avoid integral windup (not optimal)
+      self.error_int[0] += error_surge * dt
+      self.error_int[0] = self._clamp(self.error_int[0], self.pitch_limits)
 
-      if self.roll_limits[0] <= self.error_int[1] <= self.roll_limits[1]:
-        self.error_int[1] += error_sway * dt
+      self.error_int[1] += error_sway * dt
+      self.error_int[1] = self._clamp(self.error_int[1], self.roll_limits)
 
     else:
       error_surge_dot = error_sway_dot = 0

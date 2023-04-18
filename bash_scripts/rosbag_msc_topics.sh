@@ -55,7 +55,8 @@ ESTIMATE_TOPICS="\
 
 GNC_TOPICS="\
         /guidance/pure_pursuit/velocity_reference
-        /guidance/desired_ned_position"
+        /guidance/desired_ned_position \
+        /velocity_error"
 
 PLANNING_TOPICS="\
         /mission_controller/planning_status \

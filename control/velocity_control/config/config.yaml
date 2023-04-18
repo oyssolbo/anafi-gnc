@@ -2,13 +2,13 @@ node_rate: 20
 
 
 attitude_limits:
-  pitch: [-5, 5]  # deg
-  roll: [-5, 5]   # deg
+  pitch:  [-5, 5] # deg
+  roll:   [-5, 5] # deg
 
 
 velocity_reference_model:
   omegas: [10, 10]
-  zetas: [1, 1]
+  zetas:  [1, 1]
 
   # First order reference model for vertical velocity
   T_z: 0.5
@@ -17,28 +17,28 @@ velocity_reference_model:
 
 pid: 
   x_axis:
-    kp: 0.35   
-    ki: 0.1  
+    kp: 0.131   
+    ki: 0.00175  
     kd: 0.0
   y_axis:
-    kp: 0.35 
-    ki: 0.1  
+    kp: 0.131 
+    ki: 0.00175  
     kd: 0.0
 
 linear_drag_model:
-  drone_mass: 0.320 # This was set to 320, such that Martin used it in grams... Fucking idiot!
-  g: 9.82179 # [m/s²] - for Trondheim at sea level
+  drone_mass: 0.320 # This was set to 320, such that Martin used it in grams... Fuckings idiot!
+  g: 9.82179        # [m/s²] - for Trondheim at sea level
   dx: 0.08063504
   dy: 0.09929089
 
 ipid:
   x_axis:
     alpha: 0.32
-    kp: 0.35   
-    ki: 0.1  
+    kp: 0.131   
+    ki: 0.00175  
     kd: 0.0
   y_axis:
     alpha: 0.32
-    kp: 0.35 
-    ki: 0.1  
+    kp: 0.131 
+    ki: 0.00175  
     kd: 0.0
