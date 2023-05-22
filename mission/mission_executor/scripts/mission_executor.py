@@ -54,6 +54,8 @@ class MissionExecutorNode():
     self.prev_drone_state : str = None
     self.drone_state_update_timestamp : bool = False
 
+    self.apriltags_msg : anafi_uav_msgs.msg.Float32Stamped = None
+
     self.is_ordered_to_cancel_current_action : bool = False
 
     self.gnss_timestamp : rospy.Time = None
@@ -80,7 +82,10 @@ class MissionExecutorNode():
     # Setup subscribers
     rospy.Subscriber("/anafi/state", std_msgs.msg.String, self._drone_state_cb) 
     rospy.Subscriber("/anafi/ned_pose_from_gnss", geometry_msgs.msg.PointStamped, self._drone_ned_pose_from_gnss_cb)
-    rospy.Subscriber("/estimate/ekf", anafi_uav_msgs.msg.PointWithCovarianceStamped, self._ekf_cb)
+    rospy.Subscriber("/estimate/ekf", geometry_msgs.msg.PoseWithCovarianceStamped, self._ekf_cb)
+
+    rospy.Subscriber("/estimate/aprilTags/num_tags_detected", anafi_uav_msgs.msg.Float32Stamped, self._apriltags_cb)
+
 
     # Setup services
     rospy.Service("/mission_executor/service/set_planned_actions", SetPlannedActions, self._set_planned_actions_srv)
@@ -93,6 +98,7 @@ class MissionExecutorNode():
     self.move_to_ned_pos_pub = rospy.Publisher("/anafi/cmd_moveto_ned_position", geometry_msgs.msg.PointStamped, queue_size=1)
     self.move_relative_pub = rospy.Publisher("/anafi/cmd_moveby", olympe_bridge.msg.MoveByCommand, queue_size=1)
 
+    self.desired_ned_pos_pub = rospy.Publisher("/guidance/desired_ned_position", geometry_msgs.msg.PointStamped)
 
 
   def _drone_state_cb(
@@ -112,6 +118,22 @@ class MissionExecutorNode():
     self.new_state_update = True
 
 
+  def _apriltags_cb(
+        self, 
+        msg: anafi_uav_msgs.msg.Float32Stamped
+      ) -> None:
+    if self.apriltags_msg is not None:
+      msg_stamp = self.apriltags_msg.header.stamp
+    else:
+      msg_stamp = None
+
+    if not utilities.is_new_msg_timestamp(msg_stamp, msg.header.stamp):
+      # Old message
+      return
+    
+    self.apriltags_msg = msg
+
+
   def _drone_ned_pose_from_gnss_cb(
         self, 
         msg : geometry_msgs.msg.PointStamped
@@ -128,7 +150,7 @@ class MissionExecutorNode():
 
   def _ekf_cb(
         self, 
-        msg : anafi_uav_msgs.msg.PointWithCovarianceStamped
+        msg : geometry_msgs.msg.PoseWithCovarianceStamped
       ) -> None:
     msg_timestamp = msg.header.stamp
 
@@ -137,7 +159,7 @@ class MissionExecutorNode():
       return
     
     self.ekf_timestamp = msg_timestamp
-    self.pos_relative_to_helipad = -np.array([msg.position.x, msg.position.y, msg.position.z], dtype=float).reshape((3, 1)) 
+    self.pos_relative_to_helipad = -np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z], dtype=float).reshape((3, 1)) 
 
 
   def _set_planned_actions_srv(
@@ -286,20 +308,21 @@ class MissionExecutorNode():
   def _track(self) -> None:
     rospy.loginfo("Trying to enable tracking of helipad")
 
-    try:
-      service_timeout = 2.0 
+    # In the current debug mode, this should already be activated
+    # try:
+    #   service_timeout = 2.0 
       
-      # Enable the controller
-      service_response = self._get_service_interface(
-        service_type=SetBool,
-        service_name=self.controller_service_name, 
-        timeout=service_timeout 
-      )(True)
-      if not service_response.success:
-        raise ValueError("[_track()] Cannot enable controller")
+    #   # Enable the controller
+    #   service_response = self._get_service_interface(
+    #     service_type=SetBool,
+    #     service_name=self.controller_service_name, 
+    #     timeout=service_timeout 
+    #   )(True)
+    #   if not service_response.success:
+    #     raise ValueError("[_track()] Cannot enable controller")
 
-    except Exception as e:
-      rospy.logerr("[_track()] {} unavailable. Error: {}".format(self.controller_service_name, e))
+    # except Exception as e:
+    #   rospy.logerr("[_track()] {} unavailable. Error: {}".format(self.controller_service_name, e))
     
   
   def _return_to_expected_home(self) -> None:
@@ -316,47 +339,63 @@ class MissionExecutorNode():
   def _initialize_search(self, target_str : str = "helipad") -> None: # TODO: Add the initial search_position
     rospy.loginfo("Trying to search an area for target {}".format(target_str))
 
-    if self.search_points_ned.size > 0:
-      warn_message_str = "Previous points are marked to be searched. This includes:\n"
-      for col in range(self.search_points_ned.shape[1]):
-        warn_message_str += str(self.search_points_ned[0, col]) + "," + str(self.search_points_ned[1, col]) + "\n"
-      warn_message_str += "\nThese positions will be deleted as the search-initialization is currently implemented!"
-      rospy.logwarn(warn_message_str)
+    # Activate controller
+    try:
+      service_timeout = 2.0 
+      
+      # Enable the controller
+      service_response = self._get_service_interface(
+        service_type=SetBool,
+        service_name=self.controller_service_name, 
+        timeout=service_timeout 
+      )(True)
+      if not service_response.success:
+        raise ValueError("[_search()] Cannot enable controller")
 
-    # Hardcoded values
-    search_side_length = 0.5 # [m]
-    search_altitude = -2.0 # NOTE: I have no clue on the optimal altitude for searching... Discuss this with Simen
-    num_sides = 12
+    except Exception as e:
+      rospy.logerr("[_track()] {} unavailable. Error: {}".format(self.controller_service_name, e))
+
+    # if self.search_points_ned.size > 0:
+    #   warn_message_str = "Previous points are marked to be searched. This includes:\n"
+    #   for col in range(self.search_points_ned.shape[1]):
+    #     warn_message_str += str(self.search_points_ned[0, col]) + "," + str(self.search_points_ned[1, col]) + "\n"
+    #   warn_message_str += "\nThese positions will be deleted as the search-initialization is currently implemented!"
+    #   rospy.logwarn(warn_message_str)
+
+    # # Hardcoded values
+    # search_side_length = 0.5 # [m]
+    # search_altitude = -2.0 # NOTE: I have no clue on the optimal altitude for searching... Discuss this with Simen
+    # num_sides = 12
     
-    search_points_ned : np.ndarray = np.zeros((3, num_sides))
-    self.search_target : str = target_str
+    # search_points_ned : np.ndarray = np.zeros((3, num_sides))
+    # self.search_target : str = target_str
 
-    if self.pos_ned_gnss is None:
-      initial_pos = np.zeros((3, 1))
-    else:
-      initial_pos = self.pos_ned_gnss
+    # if self.pos_ned_gnss is None:
+    #   initial_pos = np.zeros((3, 1))
+    # else:
+    #   initial_pos = self.pos_ned_gnss
 
-    search_points_ned[:, 0] = initial_pos.ravel()
+    # search_points_ned[:, 0] = initial_pos.ravel()
 
-    length_multiplier = 1.0
-    for side_idx in range(1, num_sides):
-      current_x_pos = search_points_ned[0, side_idx - 1]
-      current_y_pos = search_points_ned[1, side_idx - 1] 
+    # length_multiplier = 1.0
+    # for side_idx in range(1, num_sides):
+    #   current_x_pos = search_points_ned[0, side_idx - 1]
+    #   current_y_pos = search_points_ned[1, side_idx - 1] 
  
-      if side_idx % 2 == 1:
-        next_x = current_x_pos + length_multiplier * search_side_length
-        next_y = current_y_pos
-      else:
-        next_x = current_x_pos
-        next_y = current_y_pos + length_multiplier * search_side_length
+    #   if side_idx % 2 == 1:
+    #     next_x = current_x_pos + length_multiplier * search_side_length
+    #     next_y = current_y_pos
+    #   else:
+    #     next_x = current_x_pos
+    #     next_y = current_y_pos + length_multiplier * search_side_length
 
-        # Multiplication to achieve the expanding square search
-        length_multiplier += 1 # length_multiplier * (-2.0)
+    #     # Multiplication to achieve the expanding square search
+    #     length_multiplier += 1 # length_multiplier * (-2.0)
 
-      next_pos = [next_x, next_y, search_altitude]
-      search_points_ned[:, side_idx] = np.array(next_pos, dtype=np.float).reshape((3, 1)).ravel()
+    #   next_pos = [next_x, next_y, search_altitude]
+    #   search_points_ned[:, side_idx] = np.array(next_pos, dtype=np.float).reshape((3, 1)).ravel()
 
-    self.search_points_ned = search_points_ned
+    # self.search_points_ned = search_points_ned
      
 
   def _search_positions(self) -> bool:
@@ -364,36 +403,52 @@ class MissionExecutorNode():
     This is just a very simple expanding squares search. See IAMSAR manual: Vol. 2: Mission co-ordination
     for more details
     """
-    if not self.search_points_ned.size:
-      rospy.loginfo("No positions to search")
-      return True
+    # if not self.search_points_ned.size:
+    #   rospy.loginfo("No positions to search")
+    #   return True
     
-    target_pos = self.search_points_ned[:,0]
-    if self.pos_ned_gnss is None:
-      current_pos = np.zeros((3, 1))
-    else:
-      current_pos = self.pos_ned_gnss
+    # target_pos = self.search_points_ned[:,0]
+    # if self.pos_ned_gnss is None:
+    #   current_pos = np.zeros((3, 1))
+    # else:
+    #   current_pos = self.pos_ned_gnss
 
-    horizontal_distance = np.linalg.norm((target_pos - current_pos.T)[:2])
-    vertical_distance = np.abs((target_pos - current_pos.T)[0,2])
-    if horizontal_distance <= 0.5 and vertical_distance <= 0.5:
-      # Close enough - travel to the next point of interest
-      # Mask out the first position
-      mask = np.ones(self.search_points_ned.shape[1], dtype=bool)
-      mask[0] = False
-      self.search_points_ned = self.search_points_ned[:,mask] 
+    # horizontal_distance = np.linalg.norm((target_pos - current_pos.T)[:2])
+    # vertical_distance = np.abs((target_pos - current_pos.T)[0,2])
+    # if horizontal_distance <= 0.5 and vertical_distance <= 0.5:
+    #   # Close enough - travel to the next point of interest
+    #   # Mask out the first position
+    #   mask = np.ones(self.search_points_ned.shape[1], dtype=bool)
+    #   mask[0] = False
+    #   self.search_points_ned = self.search_points_ned[:,mask] 
 
-      if not self.search_points_ned.size:
-        rospy.loginfo("All areas searched...")
-        return True
+    #   if not self.search_points_ned.size:
+    #     rospy.loginfo("All areas searched...")
+    #     return True
       
-      target_pos = self.search_points_ned[:,0]
+    #   target_pos = self.search_points_ned[:,0]
         
-    target_pos = self.search_points_ned[:,0]
-    self._travel_to_ned_position(target_pos, accuracy_required=True)
+    # target_pos = self.search_points_ned[:,0]
+    # self._travel_to_ned_position(target_pos, accuracy_required=True)
 
-    return False
+    # return False
   
+    # This is just to search after the helipad location
+    desired_ned_pos_msg = geometry_msgs.msg.PointStamped()
+    desired_ned_pos_msg.header.stamp = rospy.Time.now()
+    desired_ned_pos_msg.point.x = 0.0
+    desired_ned_pos_msg.point.y = 0.0
+    desired_ned_pos_msg.point.z = -7.5 # Should be above 5 and below 10 meters
+
+    # Spam the message to increase the likelihood of detecting the helipad
+    self.desired_ned_pos_pub.publish(desired_ned_pos_msg)
+
+    # Return whether the helipad has been detected
+    if self.apriltags_msg is None:
+      return False 
+    return self.apriltags_msg.data > 0 and self.apriltags_msg.header.stamp.to_sec() <= 2.0
+
+
   
   def _communicate(self) -> None:
     # Might be split into its own thread or similar
@@ -541,15 +596,30 @@ class MissionExecutorNode():
         current_count : int         
       ) -> tuple:
     # Must get an update from the perception-module whether the object of interest has been detected
-    searched_current_position = self._search_positions()
+    # searched_current_position = self._search_positions()
+    # if searched_current_position:
+    #   # Deactivate controller
+    #   try:
+    #     service_timeout = 2.0 
+        
+    #     # Enable the controller
+    #     service_response = self._get_service_interface(
+    #       service_type=SetBool,
+    #       service_name=self.controller_service_name, 
+    #       timeout=service_timeout 
+    #     )(False)
+    #     if not service_response.success:
+    #       raise ValueError("[_search()] Cannot disable controller")
 
-    is_object_found = False # Unsure how to use this information as of now...
-                            # Currently just assuming that the search will stop if found anything, however
-                            # it may be better to continue the search afterwards 
+    #   except Exception as e:
+    #     rospy.logerr("[_track()] {} unavailable. Error: {}".format(self.controller_service_name, e))
+    # is_object_found = False # Unsure how to use this information as of now...
+    #                         # Currently just assuming that the search will stop if found anything, however
+    #                         # it may be better to continue the search afterwards 
 
-    is_search_finished = (searched_current_position and self.search_points_ned.size == 0) or is_object_found
+    # is_search_finished = (searched_current_position and self.search_points_ned.size == 0) or is_object_found
 
-    return (is_search_finished, (rospy.Time.now() - start_time).to_sec() >= self.max_expected_action_time_s, 0)
+    return (self._search_positions(), False, 0)#(rospy.Time.now() - start_time).to_sec() >= self.max_expected_action_time_s, 0)
 
 
   def _check_track_finished(
@@ -562,12 +632,19 @@ class MissionExecutorNode():
       # No input from the EKF received
       rospy.logerr("EKF does not appear to be running. Exiting tracking-action")
       return (True, False, 0)
+    
+    # This is just to track the helipad location
+    desired_ned_pos_msg = geometry_msgs.msg.PointStamped()
+    desired_ned_pos_msg.header.stamp = rospy.Time.now()
+    desired_ned_pos_msg.point.x = 0.0
+    desired_ned_pos_msg.point.y = 0.0
+    desired_ned_pos_msg.point.z = 0.0 
 
     # TODO: Add a position above the landing pad to achieve before landing
     horizontal_pos_error_normed = np.linalg.norm(self.pos_relative_to_helipad[:2])
     vertical_pos_error = self.pos_relative_to_helipad[2]
     
-    horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.05)
+    horizontal_tracking_error_limit = rospy.get_param("~horizontal_tracking_error_limit", default=0.1)
     vertical_tracking_error_limit = rospy.get_param("~vertical_tracking_error_limit", default=0.6)  # Anafi cannot be controlled lower than 0.5 m above helipad in vertical direction
                                                                                                     # Note that the horizontal position can be controlled when the 'land' action is called
 

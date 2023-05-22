@@ -69,97 +69,102 @@ class SearchAction(Actions):
 
 def generate_actions(mission_id : int) -> list:#(Actions):
   action_list = []
+  
+  action_list.append(HoverAction(2))
+  action_list.append(SearchAction())
+  action_list.append(TrackAction())
+  action_list.append(LandAction())
 
-  if mission_id == -4:
-    action_list.append(TakeoffAction(altitude=2))
-    action_list.append(HoverAction(5))
-    action_list.append(SearchAction())
+  # if mission_id == -4:
+  #   action_list.append(TakeoffAction(altitude=2))
+  #   action_list.append(HoverAction(5))
+  #   action_list.append(SearchAction())
 
 
-  if mission_id == -3:
-    action_list.append(TakeoffAction(altitude=2))
-    action_list.append(HoverAction(15))
-    action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
-    # action_list.append(TrackAction())
-    # action_list.append(LandAction())
+  # if mission_id == -3:
+  #   action_list.append(TakeoffAction(altitude=2))
+  #   action_list.append(HoverAction(15))
+  #   action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0.5, 0, -0.5, 0]).T))
+  #   # action_list.append(TrackAction())
+  #   # action_list.append(LandAction())
 
-  elif mission_id == -2:
-    action_list.append(TakeoffAction(altitude=2))
-    action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
-    action_list.append(TrackAction())
-    action_list.append(LandAction())
+  # elif mission_id == -2:
+  #   action_list.append(TakeoffAction(altitude=2))
+  #   action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
+  #   action_list.append(TrackAction())
+  #   action_list.append(LandAction())
 
-  elif mission_id == -1:
-    print("Only takeoff")
-    action_list.append(TakeoffAction(altitude=1))
+  # elif mission_id == -1:
+  #   print("Only takeoff")
+  #   action_list.append(TakeoffAction(altitude=1))
 
-  elif mission_id == 0:
-    print("Simplest action for takeoff and landing")
-    action_list.append(TakeoffAction(altitude=2))
-    action_list.append(TrackAction()) # No land
+  # elif mission_id == 0:
+  #   print("Simplest action for takeoff and landing")
+  #   action_list.append(TakeoffAction(altitude=2))
+  #   action_list.append(TrackAction()) # No land
 
-  elif mission_id == 1:
-    print("Simplest action including tracking of platform")
-    action_list.append(TakeoffAction(altitude=2))
-    action_list.append(TrackAction())
-    action_list.append(LandAction())
+  # elif mission_id == 1:
+  #   print("Simplest action including tracking of platform")
+  #   action_list.append(TakeoffAction(altitude=2))
+  #   action_list.append(TrackAction())
+  #   action_list.append(LandAction())
 
-  elif mission_id == 2:
-    print("Moving relative in a square")
-    action_list.append(TakeoffAction(altitude=2))
-    action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([-1, 0, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, -1, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
-    action_list.append(TrackAction())
-    action_list.append(LandAction())
+  # elif mission_id == 2:
+  #   print("Moving relative in a square")
+  #   action_list.append(TakeoffAction(altitude=2))
+  #   action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([-1, 0, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, -1, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0.5, 0, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0.5, 0, 0]).T))
+  #   action_list.append(TrackAction())
+  #   action_list.append(LandAction())
 
-  elif mission_id == 3:
-    print("Rotating and varying altitude before tracking")
-    action_list.append(TakeoffAction(altitude=1))
-    action_list.append(MoveRelativeAction(np.array([0, 0, 1, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0.5, -0.5, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, -0.5, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0, 0, np.pi/2.0]).T))
-    action_list.append(TrackAction())
-    action_list.append(LandAction())
+  # elif mission_id == 3:
+  #   print("Rotating and varying altitude before tracking")
+  #   action_list.append(TakeoffAction(altitude=1))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, 1, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0.5, -0.5, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, -0.5, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, 0, np.pi/2.0]).T))
+  #   action_list.append(TrackAction())
+  #   action_list.append(LandAction())
 
-  elif mission_id == 4:
-    print("Varying altitude before tracking")
-    action_list.append(TakeoffAction(altitude=1))
-    action_list.append(MoveRelativeAction(np.array([0, 0, 1, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0.5, -0.5, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, -0.5, 2, 0]).T))
+  # elif mission_id == 4:
+  #   print("Varying altitude before tracking")
+  #   action_list.append(TakeoffAction(altitude=1))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, 1, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0.5, -0.5, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, -0.5, 2, 0]).T))
 
-    action_list.append(MoveRelativeAction(np.array([0, 0, 1, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0, -0.5, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0, 3, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0, 20, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0, -10, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, 1, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, -0.5, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, 3, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, 20, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, -10, 0]).T))
 
-    action_list.append(TrackAction())
-    action_list.append(LandAction())
+  #   action_list.append(TrackAction())
+  #   action_list.append(LandAction())
 
-  else:
-    print("Moving relative with large magnitudes")
-    action_list.append(TakeoffAction(altitude=1))
-    action_list.append(MoveRelativeAction(np.array([0, 0, -1, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([10, 5, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([20, 10, 0, 0]).T))
+  # else:
+  #   print("Moving relative with large magnitudes")
+  #   action_list.append(TakeoffAction(altitude=1))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, -1, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([10, 5, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([20, 10, 0, 0]).T))
 
-    action_list.append(MoveRelativeAction(np.array([30, 15, -1, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([-10, -15, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([-20, -10, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([-30, -5, 0, 0]).T))
-    action_list.append(MoveRelativeAction(np.array([0, 0, -1, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([30, 15, -1, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([-10, -15, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([-20, -10, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([-30, -5, 0, 0]).T))
+  #   action_list.append(MoveRelativeAction(np.array([0, 0, -1, 0]).T))
 
-    action_list.append(TrackAction())
-    action_list.append(LandAction())
+  #   action_list.append(TrackAction())
+  #   action_list.append(LandAction())
 
 
   return action_list

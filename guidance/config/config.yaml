@@ -4,7 +4,7 @@ node_rate: 20
 velocity_limits:
   vx: [-0.3, 0.3]
   vy: [-0.3, 0.3]
-  vz: [-0.1, 0.1]
+  vz: [-0.25, 0.25]
 
 pure_pursuit_parameters:
   ua_max: 1.0     # Look this up later
